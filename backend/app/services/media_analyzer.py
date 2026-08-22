@@ -99,13 +99,16 @@ async def analyze_media(image_bytes: bytes, claim_text: str) -> MediaAnalysisRes
             generation_config=genai.types.GenerationConfig(
                 temperature=0.1,
                 max_output_tokens=2048,
+                response_mime_type="application/json",
             ),
         )
 
         response_text = response.text.strip()
-        if response_text.startswith("```"):
-            lines = response_text.split("\n")
-            response_text = "\n".join(lines[1:-1])
+        if "```" in response_text:
+            import re
+            match = re.search(r"```(?:json)?\s*(.*?)\s*```", response_text, re.DOTALL)
+            if match:
+                response_text = match.group(1).strip()
 
         parsed = json.loads(response_text)
 

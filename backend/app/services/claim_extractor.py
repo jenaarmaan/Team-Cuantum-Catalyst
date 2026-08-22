@@ -55,16 +55,20 @@ async def extract_claim(claim_text: str) -> ExtractedClaim:
             generation_config=genai.types.GenerationConfig(
                 temperature=0.1,
                 max_output_tokens=1024,
+                response_mime_type="application/json",
             ),
         )
 
         # Parse the JSON response
         response_text = response.text.strip()
 
-        # Handle markdown code blocks if present
-        if response_text.startswith("```"):
-            lines = response_text.split("\n")
-            response_text = "\n".join(lines[1:-1])
+        # Robust JSON extraction (removes markdown code blocks if model returned them anyway)
+        if "```" in response_text:
+            # Extract content between first ```json and ``` or just ```
+            import re
+            match = re.search(r"```(?:json)?\s*(.*?)\s*```", response_text, re.DOTALL)
+            if match:
+                response_text = match.group(1).strip()
 
         parsed = json.loads(response_text)
 

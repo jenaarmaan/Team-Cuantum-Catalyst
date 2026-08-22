@@ -7,6 +7,11 @@ from pydantic_settings import BaseSettings
 from typing import List
 
 
+import os
+
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_env_file_path = os.path.abspath(os.path.join(_current_dir, "..", "..", ".env"))
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
@@ -35,7 +40,7 @@ class Settings(BaseSettings):
         return self.max_image_size_mb * 1024 * 1024
 
     class Config:
-        env_file = ".env"
+        env_file = _env_file_path
         env_file_encoding = "utf-8"
 
 
