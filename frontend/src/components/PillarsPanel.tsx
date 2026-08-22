@@ -15,6 +15,20 @@ const DIRECTION_STYLES: Record<string, { label: string; text: string; bg: string
   NEUTRAL: { label: 'Neutral', text: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-50 dark:bg-slate-900/30 border border-slate-200/30' },
 };
 
+const STATUS_STYLES: Record<string, { label: string; bg: string; text: string }> = {
+  NOT_APPLICABLE: { label: 'N/A', bg: 'bg-slate-100 dark:bg-slate-800 border-slate-200/30', text: 'text-slate-400 dark:text-slate-500' },
+  UNAVAILABLE: { label: 'UNAVAILABLE', bg: 'bg-slate-100 dark:bg-slate-850 border-slate-200/30', text: 'text-slate-500 dark:text-slate-400' },
+  UNVERIFIABLE: { label: 'UNVERIFIABLE', bg: 'bg-slate-100 dark:bg-slate-850 border-slate-200/30', text: 'text-slate-500 dark:text-slate-400' },
+  UNKNOWN: { label: 'UNKNOWN', bg: 'bg-slate-100 dark:bg-slate-850 border-slate-200/30', text: 'text-slate-500 dark:text-slate-400' },
+  AUTHENTIC: { label: 'AUTHENTIC', bg: 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/30', text: 'text-emerald-700 dark:text-emerald-400' },
+  VERIFIED: { label: 'VERIFIED', bg: 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/30', text: 'text-emerald-700 dark:text-emerald-400' },
+  SUPPORTED: { label: 'SUPPORTED', bg: 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/30', text: 'text-emerald-700 dark:text-emerald-400' },
+  AVAILABLE: { label: 'AVAILABLE', bg: 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/30', text: 'text-emerald-700 dark:text-emerald-400' },
+  SUSPICIOUS: { label: 'SUSPICIOUS', bg: 'bg-rose-50 dark:bg-rose-950/20 border-rose-200/30', text: 'text-rose-700 dark:text-rose-400' },
+  CONTRADICTED: { label: 'CONTRADICTED', bg: 'bg-rose-50 dark:bg-rose-950/20 border-rose-200/30', text: 'text-rose-700 dark:text-rose-400' },
+  MISLEADING_CONTEXT: { label: 'MISLEADING CONTEXT', bg: 'bg-rose-50 dark:bg-rose-950/20 border-rose-200/30', text: 'text-rose-700 dark:text-rose-400' },
+};
+
 export default function PillarsPanel({ pillars, claimText }: PillarsPanelProps) {
   const [expandedPillar, setExpandedPillar] = useState<string | null>(null);
 
@@ -67,10 +81,16 @@ export default function PillarsPanel({ pillars, claimText }: PillarsPanelProps) 
         {pillars.map((pillar) => {
           const isExpanded = expandedPillar === pillar.pillar_id;
           
-          // Determine availability status
-          const statusLower = pillar.status.toLowerCase();
-          const isUnavailable = statusLower === 'unavailable' || statusLower === 'unknown';
-          const isNotApplicable = statusLower === 'not_applicable';
+          // Determine dynamic status styles
+          const statusUpper = pillar.status.toUpperCase();
+          const isNotApplicable = statusUpper === 'NOT_APPLICABLE';
+          const isUnavailable = statusUpper === 'UNAVAILABLE' || statusUpper === 'UNKNOWN' || statusUpper === 'UNVERIFIABLE';
+          
+          const style = STATUS_STYLES[statusUpper] || {
+            label: statusUpper.replace('_', ' '),
+            bg: 'bg-slate-100 dark:bg-slate-800 border-slate-200/30',
+            text: 'text-slate-500 dark:text-slate-400'
+          };
 
           // Stance Direction Style
           const directionStyle = DIRECTION_STYLES[pillar.direction] || DIRECTION_STYLES.NEUTRAL;
@@ -119,15 +139,8 @@ export default function PillarsPanel({ pillars, claimText }: PillarsPanelProps) 
                 {/* Right Side: Direction Badge, Toggle Button */}
                 <div className="flex items-center justify-between md:justify-end gap-3 shrink-0">
                   {/* Status Badge */}
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-mono-tech font-bold uppercase tracking-wider
-                    ${isNotApplicable 
-                      ? 'bg-slate-100 text-slate-500' 
-                      : isUnavailable 
-                        ? 'bg-slate-100 text-slate-500 border border-slate-200/50' 
-                        : 'bg-emerald-100/60 text-emerald-800 border border-emerald-200/20'
-                    }
-                  `}>
-                    {isNotApplicable ? 'N/A' : isUnavailable ? 'Insufficient Evidence' : 'Available'}
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-mono-tech font-bold uppercase tracking-wider border ${style.bg} ${style.text}`}>
+                    {style.label}
                   </span>
 
                   {/* Stance direction badge if available and applicable */}

@@ -811,9 +811,9 @@ async def run_verification(
             "limitations": analysis_data.get("limitations", []),
         }
         
-    except Exception as e:
-        print(f"[NYASA] Unified Gemini Analysis failed: {e}")
-        # Fallback to defaults
+    except Exception as exc:
+        print(f"[NYASA] Unified Gemini Analysis failed: {exc}")
+        # Build local fallback claim extraction
         extracted_claim = ExtractedClaim(
             original_text=claim_text,
             normalized_claim=claim_text,
@@ -825,14 +825,57 @@ async def run_verification(
             atomic_claims=[claim_text],
         )
         media_analysis = None
-        for e in evidence:
-            e.stance = EvidenceStance.UNRESOLVED
-            e.stance_reasoning = "Stance classification was skipped due to server error."
+        
+        # Simple dynamic local NLP stance classification on retrieved search results
+        claim_words = set(w.lower() for w in claim_text.split() if len(w) > 3)
+        
+        supporting_sources = []
+        contradicting_sources = []
+        
+        for item in evidence:
+            text_to_check = f"{item.title} {item.snippet}".lower()
+            
+            # Contradiction keywords
+            negation_words = ["fake", "debunk", "false", "misleading", "hoax", "untrue", "incorrect", "fact check", "myth", "not true"]
+            is_contradicted = any(neg in text_to_check for neg in negation_words)
+            
+            # Relevance calculation: check if there's keyword overlap with the claim
+            overlap = len(set(w.lower() for w in item.title.split() if len(w) > 3) & claim_words)
+            
+            if is_contradicted and overlap >= 1:
+                item.stance = EvidenceStance.CONTRADICTS
+                item.stance_reasoning = f"Local NLP classification: Source text contains refutation markers ('fake', 'fact check') matching the claim."
+                contradicting_sources.append(item.title)
+            elif overlap >= 2:
+                item.stance = EvidenceStance.SUPPORTS
+                item.stance_reasoning = f"Local NLP classification: Source matches key query nouns, suggesting topical support."
+                supporting_sources.append(item.title)
+            else:
+                item.stance = EvidenceStance.UNRESOLVED
+                item.stance_reasoning = "Local NLP classification: Context is inconclusive or off-topic."
+
+        # Dynamically build explanation and findings based on the classifications
+        if contradicting_sources:
+            explanation = f"Verification engine (local fallback) identified potential misinformation. Multiple external sources contradict this claim, including: {', '.join(contradicting_sources[:2])}. (Fallback active: {exc})"
+            findings = [f"Contradiction detected: {src}" for src in contradicting_sources]
+            action = "Do not share. The claim has been refuted by online news/fact-check coverage."
+            limitations = ["Gemini API offline; verification based on Tavily keyword analysis."]
+        elif supporting_sources:
+            explanation = f"Verification engine (local fallback) retrieved matching online sources supporting the claim: {', '.join(supporting_sources[:2])}. (Fallback active: {exc})"
+            findings = [f"Supporting coverage: {src}" for src in supporting_sources]
+            action = "Verify the credibility of individual source publications before distributing."
+            limitations = ["Gemini API offline; verification based on Tavily keyword analysis."]
+        else:
+            explanation = f"Verification engine could not find decisive supporting or contradicting coverage for this claim online. (Fallback active: {exc})"
+            findings = []
+            action = "Exercise caution. No matching online news or fact checks were found."
+            limitations = ["No direct evidence found.", "Gemini API offline."]
+
         explanation_data = {
-            "explanation": f"Verification pipeline encountered a server error during analysis: {e}",
-            "key_findings": [],
-            "recommended_action": "Exercise caution before sharing.",
-            "limitations": ["System rate limits exceeded or API key configuration error."],
+            "explanation": explanation,
+            "key_findings": findings,
+            "recommended_action": action,
+            "limitations": limitations,
         }
 
     # ── Step 3: Build Provenance Signals ──

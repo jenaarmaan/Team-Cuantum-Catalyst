@@ -324,13 +324,13 @@ def fuse_signals(
             + WEIGHTS["media_analysis"] * media_score
             + WEIGHTS["cross_source_agreement"] * cross_source_score
         )
-        confidence = max(0.1, min(0.95, raw_confidence))
+        confidence = max(0.0, min(0.95, raw_confidence))
         label, display_label = _determine_assessment_label(evidence, media_analysis, confidence)
         ecs = compute_ecs(evidence, media_analysis, provenance_signals)
         
         # Build default media/context results
-        media_integrity_res = {"label": "UNCERTAIN", "score": 50, "confidence": 50}
-        context_integrity_res = {"label": "UNRESOLVED", "score": 50, "confidence": 50}
+        media_integrity_res = {"label": "UNCERTAIN", "score": 50, "confidence": 0}
+        context_integrity_res = {"label": "UNRESOLVED", "score": 50, "confidence": 0}
         
         res = AssessmentResult(
             label=label,
@@ -497,9 +497,9 @@ def fuse_signals(
     if total_weight > 0:
         raw_confidence = weighted_score_sum / total_weight
     else:
-        raw_confidence = 0.5
+        raw_confidence = 0.0
 
-    confidence = max(0.1, min(0.95, raw_confidence))
+    confidence = max(0.0, min(0.95, raw_confidence))
     ecs = compute_ecs(evidence, media_analysis, provenance_signals)
 
     res = AssessmentResult(
