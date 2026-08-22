@@ -6,7 +6,13 @@ NYASA doesn't tell you what to believe.
 It shows you why something may or may not deserve your trust.
 """
 
+import sys
 import os
+
+# Dynamically add the 'backend' folder to sys.path to support importing 'app.*'
+# when run from the monorepo root directory without PYTHONPATH environment variable set.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
