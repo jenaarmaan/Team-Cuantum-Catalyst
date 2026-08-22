@@ -592,12 +592,25 @@ async def _run_unified_gemini_analysis(
     )
     
     response_text = response.text.strip()
-    if "```" in response_text:
-        match = re.search(r"```(?:json)?\s*(.*?)\s*```", response_text, re.DOTALL)
+    
+    # Robust JSON cleaning and escaping
+    cleaned_json = response_text
+    if "```" in cleaned_json:
+        match = re.search(r"```(?:json)?\s*(.*?)\s*```", cleaned_json, re.DOTALL)
         if match:
-            response_text = match.group(1).strip()
+            cleaned_json = match.group(1).strip()
             
-    return json.loads(response_text)
+    # Escape raw newlines, carriage returns, and tabs inside double-quoted strings
+    def replace_control_chars(m):
+        val = m.group(0)
+        return val.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+        
+    cleaned_json = re.sub(r'"(?:[^"\\]|\\.)*"', replace_control_chars, cleaned_json)
+    
+    # Strip trailing commas
+    cleaned_json = re.sub(r',\s*([\]}])', r'\1', cleaned_json)
+    
+    return json.loads(cleaned_json)
 
 
 async def run_verification(
