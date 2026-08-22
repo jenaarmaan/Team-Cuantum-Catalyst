@@ -22,6 +22,7 @@ Grounded Explanation
 NYASA REPORT
 """
 
+from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -32,6 +33,7 @@ from app.models.schemas import (
     EvidenceStance,
     PillarResult,
     MediaAnalysisResult,
+    CanonicalImage,
 )
 from app.services.claim_extractor import extract_claim
 from app.services.media_analyzer import analyze_media
@@ -622,7 +624,6 @@ async def run_verification(
                 normalized_width = original_width
                 normalized_height = original_height
 
-            from app.models.schemas import CanonicalImage
             canonical_image = CanonicalImage(
                 image_id=image_id,
                 sha256=sha256,
