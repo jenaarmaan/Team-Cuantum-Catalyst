@@ -1,0 +1,25 @@
+# API Secrets / Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python environment
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node / Frontend builds
+node_modules/
+dist/
+out/
+build/
+
+# OS/IDE settings
+.DS_Store
+.vscode/
+.idea/
+*.swp
