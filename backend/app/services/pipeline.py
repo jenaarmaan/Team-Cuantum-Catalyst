@@ -31,6 +31,7 @@ from app.models.schemas import (
     ProvenanceSignal,
     EvidenceStance,
     PillarResult,
+    MediaAnalysisResult,
 )
 from app.services.claim_extractor import extract_claim
 from app.services.media_analyzer import analyze_media
