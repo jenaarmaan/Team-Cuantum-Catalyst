@@ -5,25 +5,61 @@
  * It shows you why something may or may not deserve your trust.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { VerificationResponse } from './types/verification';
-import { STANCE_CONFIGS } from './types/verification';
 import { submitVerification } from './services/api';
 import UploadBox from './components/UploadBox';
 import AnalysisProgress from './components/AnalysisProgress';
-import AssessmentCard from './components/AssessmentCard';
-import EvidenceCard from './components/EvidenceCard';
 import MediaAnalysis from './components/MediaAnalysis';
 import PillarsPanel from './components/PillarsPanel';
 import UncertaintyPanel from './components/UncertaintyPanel';
+import EvidenceCard from './components/EvidenceCard';
+import ProblemScenario from './components/ProblemScenario';
+import ComparisonTable from './components/ComparisonTable';
+import PipelineDiagram from './components/PipelineDiagram';
 import './index.css';
 
 type AppState = 'input' | 'loading' | 'result' | 'error';
+type ThemeMode = 'system' | 'light' | 'dark';
 
 function App() {
   const [state, setState] = useState<AppState>('input');
   const [result, setResult] = useState<VerificationResponse | null>(null);
   const [error, setError] = useState<string>('');
+  const [theme, setTheme] = useState<ThemeMode>('system');
+
+  // Theme Controller Effect
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else if (theme === 'light') {
+      root.classList.remove('dark');
+    } else {
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (systemDark) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    }
+  }, [theme]);
+
+  // Handle system preference change listener
+  useEffect(() => {
+    if (theme !== 'system') return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+      const root = window.document.documentElement;
+      if (e.matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    };
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+    return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+  }, [theme]);
 
   const handleSubmit = async (claim: string, image: File | null) => {
     setState('loading');
@@ -56,12 +92,24 @@ function App() {
     setError('');
   };
 
+  const scrollToAnalyzer = () => {
+    document.getElementById('analyzer-section')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Get active signals count (non-unavailable, non-N/A) for convergence display
+  const getActiveSignalsCount = (res: VerificationResponse) => {
+    const active = res.pillars.filter(
+      p => p.applicable && p.status !== 'UNAVAILABLE' && p.status !== 'UNKNOWN'
+    ).length;
+    return `${active}/6 signals verified`;
+  };
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-nyasa-bg text-nyasa-text transition-colors duration-200">
       {/* Header */}
-      <header className="border-b border-nyasa-border bg-white sticky top-0 z-50 shadow-sm">
+      <header className="border-b border-nyasa-border bg-nyasa-surface sticky top-0 z-50 shadow-xs transition-colors duration-200">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button onClick={handleReset} className="flex items-center gap-2 group">
+          <button onClick={handleReset} className="flex items-center gap-2 group cursor-pointer bg-transparent border-0">
             <div className="w-8 h-8 rounded-lg bg-nyasa-primary flex items-center justify-center text-white">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -74,102 +122,89 @@ function App() {
           
           {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-6">
-            <button onClick={handleReset} className="text-sm font-medium text-nyasa-primary bg-sky-50 px-3 py-1.5 rounded-lg">Home</button>
-            <a href="#faqs" className="text-sm font-medium text-nyasa-text-muted hover:text-nyasa-text transition-colors">FAQs</a>
-            <a href="#blog" className="text-sm font-medium text-nyasa-text-muted hover:text-nyasa-text transition-colors">Blog</a>
-            <a href="#about" className="text-sm font-medium text-nyasa-text-muted hover:text-nyasa-text transition-colors">About</a>
-            <a href="#contact" className="text-sm font-medium text-nyasa-text-muted hover:text-nyasa-text transition-colors">Contact</a>
+            <button onClick={handleReset} className="text-sm font-medium text-nyasa-primary bg-nyasa-primary-muted px-3 py-1.5 rounded-lg cursor-pointer">
+              Home
+            </button>
+            <a href="#problem-section" className="text-sm font-medium text-nyasa-text-dim hover:text-nyasa-text transition-colors">Why Context</a>
+            <a href="#comparison-section" className="text-sm font-medium text-nyasa-text-dim hover:text-nyasa-text transition-colors">Watermarks vs. NYASA</a>
+            <a href="#diagram-section" className="text-sm font-medium text-nyasa-text-dim hover:text-nyasa-text transition-colors">How It Works</a>
+            <button onClick={scrollToAnalyzer} className="text-sm font-medium text-nyasa-text-dim hover:text-nyasa-text transition-colors cursor-pointer bg-transparent border-0">
+              Verify File
+            </button>
           </nav>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
-        {/* ── INPUT STATE ── */}
+        
+        {/* ── 1. INPUT/LANDING STATE ── */}
         {state === 'input' && (
-          <div className="animate-fade-in-up">
-            {/* Hero */}
-            <div className="text-center mb-10 pt-6">
-              {/* Technical Monospace Pill */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-sky-100 bg-sky-50/50 text-[11px] font-bold uppercase tracking-wider text-nyasa-primary font-mono-tech mb-4">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-nyasa-primary animate-pulse"></span>
-                FREE & INSTANT ANALYSIS
-              </div>
+          <div className="space-y-4">
+            
+            {/* HERO SECTION */}
+            <section className="text-center py-16 md:py-24 relative overflow-hidden rounded-3xl border border-nyasa-border bg-nyasa-surface shadow-xs px-6">
+              {/* Subtle radial glow */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-nyasa-primary/5 blur-3xl pointer-events-none" />
               
-              <h1 className="text-4xl md:text-5xl font-bold text-nyasa-text mb-4 tracking-tight leading-none">
-                Fake Image <span className="text-nyasa-primary">Detector</span>
-              </h1>
-              <p className="text-md text-nyasa-text-muted max-w-xl mx-auto leading-relaxed">
-                Expose manipulated and AI-generated images in seconds with a four-layer 
-                forensic pipeline: <strong>AI detection</strong>, <strong>metadata analysis</strong>, 
-                <strong>Error Level Analysis (ELA)</strong> and <strong>context verification</strong>.
-              </p>
-            </div>
-
-            {/* Upload Box */}
-            <UploadBox onSubmit={handleSubmit} isLoading={false} />
-
-            {/* Sub-header text matching reference */}
-            <div className="text-center mt-16 mb-8">
-              <h2 className="text-xl font-bold text-nyasa-text mb-2">Everything you need to verify an image</h2>
-              <p className="text-sm text-nyasa-text-muted">A complete forensic toolkit: free, private, and fast enough for everyday fact-checking.</p>
-            </div>
-
-            {/* 4-Column Feature Cards matching reference */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[
-                { 
-                  icon: (
-                    <svg className="w-5 h-5 text-nyasa-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                    </svg>
-                  ),
-                  title: 'AI Image Detection', 
-                  desc: 'Identifies forensic artifacts commonly left by AI image generators, including Midjourney, DALL-E, and Stable Diffusion.' 
-                },
-                { 
-                  icon: (
-                    <svg className="w-5 h-5 text-nyasa-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  ),
-                  title: 'Metadata Analysis', 
-                  desc: 'Extracts EXIF metadata, embedded headers, software signatures, timestamps, GPS information, and camera device configurations.' 
-                },
-                { 
-                  icon: (
-                    <svg className="w-5 h-5 text-nyasa-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                    </svg>
-                  ),
-                  title: 'Error Level Analysis (ELA)', 
-                  desc: 'Performs ELA by resaving the image at a known quality level and comparing errors to highlight edited or modified regions.' 
-                },
-                { 
-                  icon: (
-                    <svg className="w-5 h-5 text-nyasa-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  ),
-                  title: 'Privacy-First Processing', 
-                  desc: 'Every uploaded image is analyzed entirely in memory and is never permanently stored on our servers. Your data is yours alone.' 
-                },
-              ].map((step) => (
-                <div key={step.title} className="glass-card p-6 flex flex-col items-start text-left bg-white">
-                  <div className="w-10 h-10 rounded-lg bg-sky-50 flex items-center justify-center mb-4 border border-sky-100/50">
-                    {step.icon}
-                  </div>
-                  <h3 className="font-bold text-nyasa-text text-md mb-2">{step.title}</h3>
-                  <p className="text-xs text-nyasa-text-muted leading-relaxed">{step.desc}</p>
+              <div className="relative z-10">
+                {/* Technical Monospace Pill */}
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-nyasa-primary/20 bg-nyasa-primary-muted text-[10px] font-bold uppercase tracking-wider text-nyasa-primary font-mono-tech mb-6">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-nyasa-primary animate-pulse"></span>
+                  Multi-Signal Context Engine
                 </div>
-              ))}
-            </div>
+                
+                <h1 className="text-4xl md:text-5xl font-extrabold text-nyasa-text mb-6 tracking-tight leading-tight max-w-3xl mx-auto">
+                  SynthID & C2PA verify origin. <br />
+                  <span className="text-nyasa-primary">NYASA verifies if you can trust the claim.</span>
+                </h1>
+                
+                <p className="text-sm md:text-md text-nyasa-text-muted max-w-xl mx-auto leading-relaxed mb-8">
+                  Assessing media authenticity is more than watermarking. NYASA fuses file diagnostics, 
+                  EXIF metadata, C2PA cryptographic lineage, visual forensicts, and web evidence to determine if media matches its claim.
+                </p>
+
+                <button 
+                  onClick={scrollToAnalyzer}
+                  className="px-8 py-3.5 bg-nyasa-primary hover:bg-nyasa-primary-glow text-white font-bold rounded-xl text-md transition-all duration-300 shadow-md shadow-nyasa-primary/20 hover:shadow-nyasa-primary/35 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                >
+                  Verify Media & Claim
+                </button>
+              </div>
+            </section>
+
+            {/* 2. THE PROBLEM SCENARIO */}
+            <section id="problem-section" className="border-t border-nyasa-border pt-6">
+              <ProblemScenario />
+            </section>
+
+            {/* 3. COMPARISON TABLE */}
+            <section id="comparison-section" className="border-t border-nyasa-border pt-6">
+              <ComparisonTable />
+            </section>
+
+            {/* 4. HOW IT WORKS: DIAGRAM */}
+            <section id="diagram-section" className="border-t border-nyasa-border pt-6">
+              <PipelineDiagram />
+            </section>
+
+            {/* 5. LIVE ANALYZER SECTION */}
+            <section id="analyzer-section" className="border-t border-nyasa-border py-16">
+              <div className="text-center max-w-2xl mx-auto mb-10">
+                <h2 className="text-3xl font-bold text-nyasa-text tracking-tight">Interactive Analyzer</h2>
+                <p className="text-sm text-nyasa-text-dim mt-2">
+                  Upload an image, video, or audio file, attach a claim, and NYASA's engine will evaluate its credibility.
+                </p>
+              </div>
+              <UploadBox onSubmit={handleSubmit} isLoading={false} />
+            </section>
+
           </div>
         )}
 
-        {/* ── LOADING STATE ── */}
+        {/* ── 2. LOADING STATE ── */}
         {state === 'loading' && <AnalysisProgress />}
 
-        {/* ── ERROR STATE ── */}
+        {/* ── 3. ERROR STATE ── */}
         {state === 'error' && (
           <div className="text-center py-16 animate-fade-in-up">
             <div className="w-16 h-16 rounded-full bg-nyasa-contradicted/10 flex items-center justify-center mx-auto mb-6">
@@ -180,20 +215,20 @@ function App() {
             <button
               onClick={handleReset}
               className="px-6 py-3 rounded-xl bg-nyasa-primary text-white font-medium
-                         hover:bg-nyasa-primary-glow transition-colors"
+                         hover:bg-nyasa-primary-glow transition-colors cursor-pointer"
             >
               Try Again
             </button>
           </div>
         )}
 
-        {/* ── RESULT STATE ── */}
+        {/* ── 4. RESULT STATE ── */}
         {state === 'result' && result && (
           <div className="space-y-6">
             {/* Back button */}
             <button
               onClick={handleReset}
-              className="flex items-center gap-2 text-sm text-nyasa-text-dim hover:text-nyasa-text transition-colors mb-2"
+              className="flex items-center gap-2 text-sm text-nyasa-text-dim hover:text-nyasa-text transition-colors mb-2 cursor-pointer bg-transparent border-0"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -202,23 +237,105 @@ function App() {
             </button>
 
             {/* Claim being verified */}
-            <div className="glass-card p-5 animate-fade-in-up">
-              <p className="text-xs text-nyasa-text-dim uppercase tracking-wider mb-2">Claim under verification</p>
-              <p className="text-nyasa-text font-medium">"{result.claim_text}"</p>
+            <div className="glass-card p-5 animate-fade-in-up bg-nyasa-surface">
+              <p className="text-xs text-nyasa-text-dim uppercase tracking-wider mb-2 font-mono-tech">Claim under verification</p>
+              <p className="text-nyasa-text font-bold text-md">"{result.claim_text}"</p>
               {result.extracted_claim.location && (
-                <div className="flex gap-3 mt-3 text-xs text-nyasa-text-dim">
-                  {result.extracted_claim.location && <span>📍 {result.extracted_claim.location}</span>}
-                  {result.extracted_claim.time_reference && <span>🕐 {result.extracted_claim.time_reference}</span>}
-                  {result.extracted_claim.event_type && <span>📌 {result.extracted_claim.event_type}</span>}
+                <div className="flex flex-wrap gap-4 mt-3 text-xs text-nyasa-text-dim font-mono-tech">
+                  {result.extracted_claim.location && <span>📍 Location: {result.extracted_claim.location}</span>}
+                  {result.extracted_claim.time_reference && <span>🕐 Time: {result.extracted_claim.time_reference}</span>}
+                  {result.extracted_claim.event_type && <span>📌 Type: {result.extracted_claim.event_type}</span>}
                 </div>
               )}
             </div>
 
-            {/* Primary Assessment */}
-            <AssessmentCard assessment={result.assessment} uncertainty={result.uncertainty} />
+            {/* glanceable assessment top panel */}
+            <div className="glass-card p-6 bg-nyasa-surface border border-nyasa-border animate-fade-in-up grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+              
+              {/* Verdict column (4 cols) */}
+              <div className="md:col-span-4 flex flex-col items-start text-left border-b md:border-b-0 md:border-r border-nyasa-border pb-4 md:pb-0 md:pr-6">
+                <span className="text-[10px] font-bold text-nyasa-text-dim uppercase tracking-wider mb-2 font-mono-tech">Assessment Label</span>
+                <span className="px-3.5 py-1.5 rounded-xl font-extrabold text-sm flex items-center gap-2 border" style={{
+                  backgroundColor: `${result.assessment.label === 'insufficient_evidence' || result.assessment.label === 'inconclusive' ? 'rgba(107, 114, 128, 0.1)' : result.assessment.label.includes('supported') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}`,
+                  color: `${result.assessment.label === 'insufficient_evidence' || result.assessment.label === 'inconclusive' ? '#6b7280' : result.assessment.label.includes('supported') ? '#10b981' : '#ef4444'}`,
+                  borderColor: `${result.assessment.label === 'insufficient_evidence' || result.assessment.label === 'inconclusive' ? 'rgba(107, 114, 128, 0.2)' : result.assessment.label.includes('supported') ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                }}>
+                  {result.assessment.display_label}
+                </span>
+                
+                {/* Separate Media / Context indicators */}
+                {result.media_integrity && (
+                  <div className="mt-4 space-y-1.5 w-full">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-nyasa-text-dim">Media Authenticity:</span>
+                      <span className="font-bold text-nyasa-text">{result.media_integrity.label.replace('_', ' ')}</span>
+                    </div>
+                    {result.context_integrity && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-nyasa-text-dim">Context Consistency:</span>
+                        <span className="font-bold text-nyasa-text">{result.context_integrity.label.replace('_', ' ')}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Confidence Meter column (3 cols) */}
+              <div className="md:col-span-3 flex flex-col items-center border-b md:border-b-0 md:border-r border-nyasa-border pb-4 md:pb-0 md:px-4">
+                <span className="text-[10px] font-bold text-nyasa-text-dim uppercase tracking-wider mb-2 font-mono-tech">Confidence Score</span>
+                
+                <div className="relative w-20 h-20 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle cx="40" cy="40" r="34" className="stroke-nyasa-border fill-none" strokeWidth="6" />
+                    <circle 
+                      cx="40" 
+                      cy="40" 
+                      r="34" 
+                      className="stroke-nyasa-primary fill-none transition-all duration-1000 ease-out" 
+                      strokeWidth="6" 
+                      strokeDasharray="213" 
+                      strokeDashoffset={213 - (213 * result.assessment.confidence_percent) / 100}
+                    />
+                  </svg>
+                  <span className="absolute text-md font-extrabold text-nyasa-text">{result.assessment.confidence_percent}%</span>
+                </div>
+              </div>
+
+              {/* ECS & Convergence column (5 cols) */}
+              <div className="md:col-span-5 flex flex-col justify-between text-left space-y-4 md:pl-6">
+                <div className="flex items-center justify-between w-full">
+                  <div>
+                    <span className="text-[10px] font-bold text-nyasa-text-dim uppercase tracking-wider block font-mono-tech">Credibility (ECS)</span>
+                    <span className="text-2xl font-extrabold text-nyasa-text font-mono-tech">{result.assessment.ecs}/100</span>
+                  </div>
+                  
+                  <div>
+                    <span className="text-[10px] font-bold text-nyasa-text-dim uppercase tracking-wider block font-mono-tech">Uncertainty</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider font-mono-tech
+                      ${result.uncertainty.level === 'low' 
+                        ? 'bg-emerald-50 text-emerald-700' 
+                        : result.uncertainty.level === 'moderate' 
+                          ? 'bg-amber-50 text-amber-700' 
+                          : 'bg-rose-50 text-rose-700'
+                      }
+                    `}>
+                      {result.uncertainty.level}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 border border-nyasa-border p-2.5 rounded-lg w-full flex items-center justify-between">
+                  <span className="text-xs text-nyasa-text-dim font-medium">Evidence Convergence</span>
+                  <span className="text-xs font-bold text-nyasa-primary font-mono-tech">
+                    {getActiveSignalsCount(result)}
+                  </span>
+                </div>
+              </div>
+
+            </div>
 
             {/* Why — Explanation */}
-            <div className="glass-card p-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+            <div className="glass-card p-6 animate-fade-in-up bg-nyasa-surface" style={{ animationDelay: '100ms' }}>
               <h3 className="text-lg font-semibold text-nyasa-text mb-3 flex items-center gap-2">
                 <span className="text-nyasa-primary">💡</span> Why?
               </h3>
@@ -237,8 +354,8 @@ function App() {
               )}
             </div>
 
-            {/* The 6 Pillars of NYASA */}
-            <PillarsPanel pillars={result.pillars} />
+            {/* The 6 Pillars of NYASA (expandable rows) */}
+            <PillarsPanel pillars={result.pillars} claimText={result.claim_text} />
 
             {/* Media Analysis (if image was provided) */}
             {result.media_analysis && (
@@ -248,14 +365,14 @@ function App() {
             {/* Evidence Summary Bar */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
               {[
-                { label: 'Supporting', count: result.supporting_count, color: STANCE_CONFIGS.supports.color },
-                { label: 'Contradicting', count: result.contradicting_count, color: STANCE_CONFIGS.contradicts.color },
-                { label: 'Contextual', count: result.context_count, color: STANCE_CONFIGS.context.color },
-                { label: 'Unresolved', count: result.unresolved_count, color: STANCE_CONFIGS.unresolved.color },
+                { label: 'Supporting', count: result.supporting_count, color: '#10b981' },
+                { label: 'Contradicting', count: result.contradicting_count, color: '#ef4444' },
+                { label: 'Contextual', count: result.context_count, color: '#3b82f6' },
+                { label: 'Unresolved', count: result.unresolved_count, color: '#6b7280' },
               ].map((s) => (
                 <div
                   key={s.label}
-                  className="glass-card p-4 text-center"
+                  className="glass-card p-4 text-center bg-nyasa-surface"
                   style={{ borderColor: `${s.color}20` }}
                 >
                   <p className="text-2xl font-bold" style={{ color: s.color }}>{s.count}</p>
@@ -266,9 +383,9 @@ function App() {
 
             {/* Evidence Cards */}
             {result.evidence.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold text-nyasa-text mb-4 flex items-center gap-2">
-                  <span>📋</span> Evidence
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-nyasa-text flex items-center gap-2">
+                  <span>📋</span> Evidence List
                 </h3>
                 <div className="space-y-3">
                   {result.evidence.map((item, i) => (
@@ -282,21 +399,21 @@ function App() {
             <UncertaintyPanel uncertainty={result.uncertainty} />
 
             {/* Recommended Action */}
-            <div className="glass-card p-6 animate-fade-in-up border-nyasa-primary/20" style={{ animationDelay: '600ms' }}>
+            <div className="glass-card p-6 animate-fade-in-up bg-nyasa-surface border-nyasa-primary/20" style={{ animationDelay: '600ms' }}>
               <h3 className="text-lg font-semibold text-nyasa-text mb-3 flex items-center gap-2">
                 <span>🎯</span> Recommended Action
               </h3>
-              <p className="text-sm text-nyasa-text-muted">{result.recommended_action}</p>
+              <p className="text-sm text-nyasa-text-muted leading-relaxed">{result.recommended_action}</p>
             </div>
 
             {/* Limitations */}
             {result.limitations.length > 0 && (
-              <div className="glass-card p-5 animate-fade-in-up" style={{ animationDelay: '700ms' }}>
+              <div className="glass-card p-5 animate-fade-in-up bg-nyasa-surface" style={{ animationDelay: '700ms' }}>
                 <h3 className="text-sm font-semibold text-nyasa-text-dim mb-3">Limitations</h3>
                 <div className="space-y-2">
                   {result.limitations.map((lim, i) => (
                     <p key={i} className="text-xs text-nyasa-text-dim flex items-start gap-2">
-                      <span className="shrink-0">⚬</span> {lim}
+                      <span className="shrink-0 mt-0.5">⚬</span> {lim}
                     </p>
                   ))}
                 </div>
@@ -316,9 +433,10 @@ function App() {
         )}
       </main>
 
-      {/* Footer matching reference screenshot 1 */}
-      <footer className="border-t border-nyasa-border bg-white mt-16 py-12 text-left">
+      {/* Footer */}
+      <footer className="border-t border-nyasa-border bg-nyasa-surface mt-16 py-12 text-left transition-colors duration-200">
         <div className="max-w-5xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-8">
+          
           {/* Column 1: Logo & Info */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -332,25 +450,18 @@ function App() {
               </span>
             </div>
             <p className="text-xs text-nyasa-text-muted leading-relaxed">
-              Free four-layer image forensics: AI detection, metadata analysis, 
-              Error Level Analysis and watermark scanning to expose manipulated and 
-              AI-generated images.
+              NYASA is a six-pillar evidence-fusion media-authenticity engine. It verifies whether you can trust the context of what you're looking at, going deeper than standard cryptographic metadata signatures.
             </p>
-            {/* Social Icons */}
-            <div className="flex gap-2 pt-2">
-              <a href="#twitter" className="w-8 h-8 rounded-lg border border-nyasa-border flex items-center justify-center hover:bg-sky-50 transition-colors text-xs text-nyasa-text-muted hover:text-nyasa-primary">X</a>
-              <a href="#facebook" className="w-8 h-8 rounded-lg border border-nyasa-border flex items-center justify-center hover:bg-sky-50 transition-colors text-xs text-nyasa-text-muted hover:text-nyasa-primary">f</a>
-            </div>
           </div>
 
           {/* Column 2: Explore */}
           <div>
             <h4 className="text-xs font-bold text-nyasa-text-dim uppercase tracking-wider font-mono-tech mb-4">Explore</h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="#blog" className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors">Blog</a></li>
-              <li><a href="#faqs" className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors">FAQs</a></li>
-              <li><a href="#about" className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors">About Us</a></li>
-              <li><a href="#contact" className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors">Contact</a></li>
+              <li><button onClick={handleReset} className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors cursor-pointer bg-transparent border-0">Home</button></li>
+              <li><button onClick={scrollToAnalyzer} className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors cursor-pointer bg-transparent border-0 text-left">Verify Content</button></li>
+              <li><a href="#problem-section" className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors">Decoy Scenario</a></li>
+              <li><a href="#diagram-section" className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors">Architecture Flow</a></li>
             </ul>
           </div>
 
@@ -359,8 +470,8 @@ function App() {
             <h4 className="text-xs font-bold text-nyasa-text-dim uppercase tracking-wider font-mono-tech mb-4">Legal</h4>
             <ul className="space-y-2 text-xs">
               <li><a href="#privacy" className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors">Privacy Policy</a></li>
-              <li><a href="#terms" className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors">Terms & Conditions</a></li>
-              <li><a href="#disclaimer" className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors">Disclaimer</a></li>
+              <li><a href="#terms" className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors">Terms of Service</a></li>
+              <li><a href="#disclaimer" className="text-nyasa-text-muted hover:text-nyasa-primary transition-colors">Disclaimers</a></li>
             </ul>
           </div>
 
@@ -368,7 +479,11 @@ function App() {
           <div className="space-y-4">
             <h4 className="text-xs font-bold text-nyasa-text-dim uppercase tracking-wider font-mono-tech mb-4">Appearance</h4>
             <div className="relative">
-              <select className="w-full text-xs font-medium text-nyasa-text border border-nyasa-border rounded-lg px-3 py-2 bg-white appearance-none cursor-pointer focus:outline-none focus:border-nyasa-primary">
+              <select 
+                value={theme}
+                onChange={(e) => setTheme(e.target.value as ThemeMode)}
+                className="w-full text-xs font-medium text-nyasa-text border border-nyasa-border bg-nyasa-surface rounded-lg px-3 py-2 appearance-none cursor-pointer focus:outline-none focus:border-nyasa-primary transition-colors duration-200"
+              >
                 <option value="system">🖥️ System</option>
                 <option value="light">☀️ Light</option>
                 <option value="dark">🌙 Dark</option>

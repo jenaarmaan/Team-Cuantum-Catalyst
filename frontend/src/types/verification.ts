@@ -182,6 +182,10 @@ export interface VerificationResponse {
   recommended_action: string;
   limitations: string[];
   scoring_note: string;
+  media_integrity?: { label: string; score: number; confidence: number } | null;
+  context_integrity?: { label: string; score: number; confidence: number } | null;
+  evidence_convergence?: { supporting_count: number; contradicting_count: number; contextual_count: number; unresolved_count: number } | null;
+  uncertainty_reasons?: string[];
 }
 
 // ── UI Helpers ──

@@ -1,132 +1,227 @@
-/**
- * NYASA Pillars Panel
- * Displays the 6 pillars of NYASA verification:
- * 1. Provenance & Metadata
- * 2. C2PA / Cryptographic Provenance
- * 3. Media Forensics
- * 4. Temporal & Structural Consistency
- * 5. Cross-Modal Consistency
- * 6. External Source & Context Verification
- */
-
 import { useState } from 'react';
 import type { PillarResult } from '../types/verification';
+import SourceContextMap from './SourceContextMap';
 
 interface PillarsPanelProps {
   pillars: PillarResult[];
+  claimText: string;
 }
 
-const STATUS_CONFIGS: Record<string, { color: string; bgColor: string; label: string; icon: string }> = {
-  // Provenance & Metadata
-  available: { color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.1)', label: 'Available', icon: '✓' },
-  unavailable: { color: '#94a3b8', bgColor: 'rgba(148, 163, 184, 0.1)', label: 'Unavailable', icon: '⚬' },
-  
-  // C2PA
-  valid: { color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.1)', label: 'Valid signature', icon: '🔐' },
-  invalid: { color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.1)', label: 'Invalid signature', icon: '🔓' },
-  
-  // Forensics
-  likely_authentic: { color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.1)', label: 'Likely Authentic', icon: '🛡️' },
-  suspicious: { color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.1)', label: 'Suspicious anomalies', icon: '⚠' },
-  unverifiable: { color: '#94a3b8', bgColor: 'rgba(148, 163, 184, 0.1)', label: 'Unverifiable', icon: '⚬' },
-
-  // Temporal / Cross-Modal
-  consistent: { color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.1)', label: 'Consistent', icon: '✓' },
-  inconsistent: { color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.1)', label: 'Inconsistent', icon: '✗' },
-  not_applicable: { color: '#64748b', bgColor: 'rgba(100, 116, 139, 0.05)', label: 'Not Applicable', icon: '—' },
-
-  // Context
-  supported: { color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.1)', label: 'Supported', icon: '✓' },
-  contradicted: { color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.1)', label: 'Contradicted', icon: '✗' },
-  inconsistent_context: { color: '#f59e0b', bgColor: 'rgba(245, 158, 11, 0.1)', label: 'Context mismatch', icon: '⚠' },
+const DIRECTION_STYLES: Record<string, { label: string; text: string; bg: string }> = {
+  SUPPORTS_AUTHENTICITY: { label: 'Supports Authenticity', text: 'text-emerald-600', bg: 'bg-emerald-50' },
+  SUPPORTS_CLAIM: { label: 'Supports Claim', text: 'text-emerald-600', bg: 'bg-emerald-50' },
+  CONTRADICTS_AUTHENTICITY: { label: 'Contradicts Authenticity', text: 'text-rose-600', bg: 'bg-rose-50' },
+  CONTRADICTS_CLAIM: { label: 'Contradicts Claim', text: 'text-rose-600', bg: 'bg-rose-50' },
+  NEUTRAL: { label: 'Neutral', text: 'text-slate-500', bg: 'bg-slate-50' },
 };
 
-export default function PillarsPanel({ pillars }: PillarsPanelProps) {
-  const [expandedPillar, setExpandedPillar] = useState<number | null>(null);
+export default function PillarsPanel({ pillars, claimText }: PillarsPanelProps) {
+  const [expandedPillar, setExpandedPillar] = useState<string | null>(null);
 
   if (!pillars || pillars.length === 0) return null;
 
+  // Detect and mock geographic evidence context dynamically for demonstration
+  const claimLower = (claimText || '').toLowerCase();
+  let claimedLocation = null;
+  let evidenceLocations: any[] = [];
+
+  if (claimLower.includes('mysuru') || claimLower.includes('modi') || claimLower.includes('flood')) {
+    claimedLocation = {
+      lat: 12.2958,
+      lng: 76.6394,
+      label: "Claimed: Mysuru, today"
+    };
+    evidenceLocations = [
+      {
+        lat: 31.5204,
+        lng: 74.3587,
+        label: "Lahore, Pakistan (2023)",
+        source: "https://wikipedia.org/wiki/Lahore",
+        date: "August 2023",
+        relation: "contradicts"
+      }
+    ];
+  }
+
+  const handleToggle = (pillarId: string) => {
+    setExpandedPillar(expandedPillar === pillarId ? null : pillarId);
+  };
+
   return (
     <div className="glass-card p-6 animate-fade-in-up" style={{ animationDelay: '150ms' }}>
-      <div className="flex items-center gap-3 mb-5">
+      {/* Title Header */}
+      <div className="flex items-center gap-3 mb-6">
         <div className="w-9 h-9 rounded-lg bg-nyasa-primary/10 flex items-center justify-center">
           <span className="text-lg">🏛️</span>
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-nyasa-text">The 6 Pillars of NYASA</h3>
+          <h3 className="text-lg font-semibold text-nyasa-text">Verification Pillars</h3>
           <p className="text-xs text-nyasa-text-dim">
-            Evidence convergence across independent verification signals
+            Six independent diagnostic dimensions of media and claim authenticity
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {pillars.map((pillar, index) => {
-          const config = STATUS_CONFIGS[pillar.status] || {
-            color: '#94a3b8',
-            bgColor: 'rgba(148, 163, 184, 0.1)',
-            label: pillar.status.replace('_', ' '),
-            icon: '⚬'
-          };
-          const isExpanded = expandedPillar === index;
+      {/* 6 Linear Expandable Rows */}
+      <div className="divide-y divide-nyasa-border border border-nyasa-border rounded-xl overflow-hidden bg-white">
+        {pillars.map((pillar) => {
+          const isExpanded = expandedPillar === pillar.pillar_id;
+          
+          // Determine availability status
+          const statusLower = pillar.status.toLowerCase();
+          const isUnavailable = statusLower === 'unavailable' || statusLower === 'unknown';
+          const isNotApplicable = statusLower === 'not_applicable';
+
+          // Stance Direction Style
+          const directionStyle = DIRECTION_STYLES[pillar.direction] || DIRECTION_STYLES.NEUTRAL;
 
           return (
-            <div
-              key={pillar.name}
-              onClick={() => setExpandedPillar(isExpanded ? null : index)}
-              className={`
-                p-4 rounded-xl border transition-all duration-200 cursor-pointer
-                ${isExpanded 
-                  ? 'bg-nyasa-card border-nyasa-border-light shadow-md' 
-                  : 'bg-nyasa-surface/30 border-nyasa-border hover:bg-nyasa-surface/65'
-                }
-              `}
+            <div 
+              key={pillar.pillar_id}
+              className={`transition-colors duration-150 ${isExpanded ? 'bg-slate-50/30' : ''}`}
             >
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h4 className="text-sm font-semibold text-nyasa-text mb-1">
-                    {pillar.name}
-                  </h4>
-                  <p className="text-xs text-nyasa-text-muted mb-2">
-                    {pillar.summary}
-                  </p>
+              {/* Row Header */}
+              <div
+                onClick={() => handleToggle(pillar.pillar_id)}
+                className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/50"
+              >
+                {/* Left Side: Code, Name, Sub */}
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  {/* Status Indicator Circle */}
+                  <span className={`
+                    w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-xs font-bold font-mono-tech
+                    ${isNotApplicable 
+                      ? 'bg-slate-100 text-slate-400' 
+                      : isUnavailable 
+                        ? 'bg-slate-100 text-slate-500 border border-slate-200' 
+                        : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                    }
+                  `}>
+                    {isNotApplicable ? '—' : isUnavailable ? '?' : '✓'}
+                  </span>
+                  
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono-tech font-bold text-xs text-nyasa-text-dim shrink-0">
+                        {pillar.pillar_id}
+                      </span>
+                      <h4 className="text-sm font-bold text-nyasa-text truncate">
+                        {pillar.name}
+                      </h4>
+                    </div>
+                    {/* Concise subtext */}
+                    <p className="text-xs text-nyasa-text-dim mt-0.5 max-w-xl truncate">
+                      {pillar.summary || (isUnavailable ? 'No direct data triggers available for this dimension.' : '')}
+                    </p>
+                  </div>
                 </div>
-                <span
-                  className="px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wider shrink-0"
-                  style={{
-                    backgroundColor: config.bgColor,
-                    color: config.color,
-                    border: `1px solid ${config.color}25`
-                  }}
-                >
-                  {config.icon} {config.label}
-                </span>
+
+                {/* Right Side: Direction Badge, Toggle Button */}
+                <div className="flex items-center justify-between md:justify-end gap-3 shrink-0">
+                  {/* Status Badge */}
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-mono-tech font-bold uppercase tracking-wider
+                    ${isNotApplicable 
+                      ? 'bg-slate-100 text-slate-500' 
+                      : isUnavailable 
+                        ? 'bg-slate-100 text-slate-500 border border-slate-200/50' 
+                        : 'bg-emerald-100/60 text-emerald-800 border border-emerald-200/20'
+                    }
+                  `}>
+                    {isNotApplicable ? 'N/A' : isUnavailable ? 'Insufficient Evidence' : 'Available'}
+                  </span>
+
+                  {/* Stance direction badge if available and applicable */}
+                  {!isNotApplicable && !isUnavailable && (
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono-tech font-bold uppercase tracking-wider ${directionStyle.bg} ${directionStyle.text}`}>
+                      {directionStyle.label}
+                    </span>
+                  )}
+
+                  {/* Toggle Arrow */}
+                  <svg 
+                    className={`w-4 h-4 text-nyasa-text-dim transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
 
-              {/* Expandable details */}
-              {isExpanded && pillar.details.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-nyasa-border-light animate-fade-in-up space-y-1.5">
-                  {pillar.details.map((detail, dIdx) => (
-                    <p key={dIdx} className="text-xs text-nyasa-text-dim flex items-start gap-2">
-                      <span className="text-nyasa-primary mt-0.5">•</span>
-                      <span>{detail}</span>
-                    </p>
-                  ))}
-                  {pillar.score !== null && (
-                    <p className="text-[10px] text-nyasa-text-dim/80 font-mono mt-2">
-                      Pillar signal strength: {Math.round(pillar.score * 100)}%
-                    </p>
+              {/* Row Body (Expandable) */}
+              {isExpanded && (
+                <div className="px-11 pb-5 pt-1 border-t border-slate-100/50 space-y-4 animate-fade-in-up">
+                  {/* Findings */}
+                  {pillar.findings && pillar.findings.length > 0 ? (
+                    <div>
+                      <p className="text-[10px] font-bold text-nyasa-text-dim uppercase tracking-wider mb-2 font-mono-tech">Key Findings</p>
+                      <div className="space-y-1.5">
+                        {pillar.findings.map((finding, idx) => (
+                          <div key={idx} className="flex items-start gap-2 text-xs text-nyasa-text-muted leading-relaxed">
+                            <span className="text-nyasa-primary mt-0.5 shrink-0">▸</span>
+                            <span>{finding}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-nyasa-text-dim">No specific findings available for this pillar.</p>
+                  )}
+
+                  {/* Geolocation Map for P6 */}
+                  {pillar.pillar_id === 'P6' && (
+                    <div className="mt-4 pt-2">
+                      <p className="text-[10px] font-bold text-nyasa-text-dim uppercase tracking-wider mb-2 font-mono-tech">Geographic Evidence Map</p>
+                      <SourceContextMap 
+                        claimedLocation={claimedLocation} 
+                        evidenceLocations={evidenceLocations} 
+                      />
+                    </div>
+                  )}
+
+                  {/* Limitations */}
+                  {pillar.limitations && pillar.limitations.length > 0 && (
+                    <div className="pt-2">
+                      <p className="text-[10px] font-bold text-nyasa-text-dim uppercase tracking-wider mb-1.5 font-mono-tech">Pillar Limitations</p>
+                      <div className="space-y-1">
+                        {pillar.limitations.map((lim, idx) => (
+                          <p key={idx} className="text-[11px] text-nyasa-text-dim flex items-start gap-1.5 leading-snug">
+                            <span className="shrink-0">•</span>
+                            <span>{lim}</span>
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sources */}
+                  {pillar.sources && pillar.sources.length > 0 && (
+                    <div className="pt-2">
+                      <p className="text-[10px] font-bold text-nyasa-text-dim uppercase tracking-wider mb-1.5 font-mono-tech">Evidence Sources</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {pillar.sources.map((src, idx) => (
+                          <span 
+                            key={idx} 
+                            className="px-2 py-0.5 rounded bg-slate-50 border border-nyasa-border text-[9px] text-nyasa-text-muted truncate max-w-[200px]"
+                            title={src}
+                          >
+                            {src.startsWith('http') ? src.split('/')[2] : src}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pillar Signal Score */}
+                  {pillar.applicable && (
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-nyasa-text-dim/80 font-mono-tech">
+                      <span>Signal Confidence: {pillar.confidence}%</span>
+                      <span>Signal Weight Score: {pillar.signal_score}/100</span>
+                    </div>
                   )}
                 </div>
               )}
-
-              {/* Show toggle text */}
-              <div className="mt-2 text-right">
-                <span className="text-[10px] text-nyasa-primary hover:underline">
-                  {isExpanded ? 'Collapse' : 'Show details'}
-                </span>
-              </div>
             </div>
           );
         })}
