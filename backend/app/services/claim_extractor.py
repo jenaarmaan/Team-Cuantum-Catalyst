@@ -29,13 +29,13 @@ Given a user's claim about a piece of media or an event, extract the following s
 
 Respond ONLY with valid JSON in this exact format:
 {
-  "normalized_claim": "...",
-  "entities": ["...", "..."],
-  "event_type": "..." or null,
-  "location": "..." or null,
-  "time_reference": "..." or null,
-  "key_assertion": "...",
-  "atomic_claims": ["...", "..."]
+  "normalized_claim": "The earth is round",
+  "entities": ["Earth"],
+  "event_type": "scientific_fact",
+  "location": null,
+  "time_reference": null,
+  "key_assertion": "The shape of the earth is round",
+  "atomic_claims": ["The earth is round"]
 }
 
 USER CLAIM:
