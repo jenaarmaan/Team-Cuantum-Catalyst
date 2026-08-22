@@ -11,16 +11,21 @@ from app.core.config import settings
 from app.models.schemas import VerificationResponse
 from app.services.pipeline import run_verification
 
-router = APIRouter(prefix="/api/v1", tags=["verification"])
+from fastapi.responses import JSONResponse
 
+router = APIRouter(prefix="/api/v1", tags=["verification"])
 
 ALLOWED_MIME_TYPES = {
     "image/jpeg",
+    "image/jpg",
     "image/png",
     "image/webp",
     "image/gif",
     "image/bmp",
+    "image/tiff",
 }
+
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif", "bmp", "tiff", "tif"}
 
 
 @router.post("/verify", response_model=VerificationResponse)
@@ -30,56 +35,95 @@ async def verify_content(
 ):
     """
     Submit content for NYASA verification.
-
-    Accepts:
-    - A textual claim (required)
-    - An optional image (JPEG, PNG, WebP)
-
-    Returns a complete NYASA verification report with:
-    - Extracted claim
-    - Media analysis (authenticity + context consistency)
-    - Evidence (supporting, contradicting, contextual)
-    - NYASA Confidence Score
-    - Structured uncertainty
-    - Evidence-grounded explanation
-    - Recommended action
-
-    NYASA never returns TRUE/FALSE. Every assessment includes evidence, confidence, and uncertainty.
     """
 
     # Validate claim
     if not claim or not claim.strip():
-        raise HTTPException(status_code=400, detail="A claim is required for verification.")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "code": "MISSING_CLAIM",
+                "message": "A claim is required for verification.",
+                "detail": "A claim is required for verification."
+            }
+        )
 
     claim_text = claim.strip()
 
     # Validate and read image if provided
     image_bytes = None
     if image:
+        # Check file extension
+        filename = image.filename or ""
+        ext = filename.split('.')[-1].lower() if '.' in filename else ""
+        if not ext or ext not in ALLOWED_EXTENSIONS:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "code": "UNSUPPORTED_IMAGE",
+                    "message": f"Unsupported file extension: .{ext}. Supported formats: JPEG, PNG, WebP, GIF, BMP, TIFF.",
+                    "detail": f"Unsupported file extension: .{ext}."
+                }
+            )
+
         # Check MIME type
         if image.content_type not in ALLOWED_MIME_TYPES:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=400,
-                detail=f"Unsupported image format: {image.content_type}. "
-                       f"Supported: JPEG, PNG, WebP, GIF, BMP.",
+                content={
+                    "status": "error",
+                    "code": "UNSUPPORTED_IMAGE",
+                    "message": f"Unsupported image format: {image.content_type}. Supported: JPEG, PNG, WebP, GIF, BMP, TIFF.",
+                    "detail": f"Unsupported image format: {image.content_type}."
+                }
             )
 
         # Read and validate size
-        image_bytes = await image.read()
-        if len(image_bytes) > settings.max_image_size_bytes:
-            raise HTTPException(
+        try:
+            image_bytes = await image.read()
+        except Exception:
+            return JSONResponse(
                 status_code=400,
-                detail=f"Image too large. Maximum size: {settings.max_image_size_mb} MB.",
+                content={
+                    "status": "error",
+                    "code": "CORRUPTED_IMAGE",
+                    "message": "The uploaded file could not be read.",
+                    "detail": "The uploaded file could not be read."
+                }
             )
 
-        # Validate it's actually an image
+        if len(image_bytes) > settings.max_image_size_bytes:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "code": "IMAGE_TOO_LARGE",
+                    "message": f"Image too large. Maximum size: {settings.max_image_size_mb} MB.",
+                    "detail": f"Image too large. Maximum size: {settings.max_image_size_mb} MB."
+                }
+            )
+
+        # Validate it's actually an image & decodable
         try:
             img = Image.open(io.BytesIO(image_bytes))
             img.verify()
-        except Exception:
-            raise HTTPException(
+            
+            # Re-open for further checks since verify() closes the file pointer
+            img = Image.open(io.BytesIO(image_bytes))
+            width, height = img.size
+            if width <= 0 or height <= 0:
+                raise ValueError("Invalid image dimensions")
+        except Exception as e:
+            return JSONResponse(
                 status_code=400,
-                detail="The uploaded file is not a valid image.",
+                content={
+                    "status": "error",
+                    "code": "CORRUPTED_IMAGE",
+                    "message": f"The uploaded file could not be decoded as a valid image: {e}.",
+                    "detail": "The uploaded file could not be processed as a valid image."
+                }
             )
 
     # Run the NYASA pipeline
@@ -91,7 +135,12 @@ async def verify_content(
         return result
     except Exception as e:
         print(f"[NYASA] Verification failed: {e}")
-        raise HTTPException(
+        return JSONResponse(
             status_code=500,
-            detail="Verification pipeline encountered an error. Please try again.",
+            content={
+                "status": "error",
+                "code": "INTERNAL_ERROR",
+                "message": "Verification pipeline encountered an error. Please try again.",
+                "detail": "Verification pipeline encountered an error. Please try again."
+            }
         )

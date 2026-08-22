@@ -26,6 +26,7 @@ def calculate_uncertainty(
     provenance_signals: List[ProvenanceSignal],
     claim_has_location: bool = False,
     claim_has_time: bool = False,
+    pillars: Optional[List] = None,
 ) -> UncertaintyResult:
     """
     Calculate structured uncertainty from measurable conditions.
@@ -35,6 +36,23 @@ def calculate_uncertainty(
     what_would_help: List[str] = []
     uncertainty_score = 0.0
 
+    # Extract pillar statuses if available
+    p1_status = "UNAVAILABLE"
+    p2_status = "UNAVAILABLE"
+    p3_status = "UNVERIFIABLE"
+    p6_status = "UNVERIFIABLE"
+
+    if pillars:
+        for p in pillars:
+            if p.pillar_id == "P1":
+                p1_status = p.status
+            elif p.pillar_id == "P2":
+                p2_status = p.status
+            elif p.pillar_id == "P3":
+                p3_status = p.status
+            elif p.pillar_id == "P6":
+                p6_status = p.status
+
     # ── Factor 1: Evidence coverage ──
     if not evidence:
         factors.append(UncertaintyFactor(
@@ -43,7 +61,7 @@ def calculate_uncertainty(
             impact="high",
         ))
         what_would_help.append("Access to more comprehensive search sources")
-        uncertainty_score += 0.3
+        uncertainty_score += 0.35
     elif len(evidence) < 3:
         factors.append(UncertaintyFactor(
             factor="limited_evidence",
@@ -64,17 +82,36 @@ def calculate_uncertainty(
                 impact="high" if min(supporting, contradicting) >= 2 else "moderate",
             ))
             what_would_help.append("Authoritative primary source to resolve the conflict")
-            uncertainty_score += 0.2
+            uncertainty_score += 0.20
 
     # ── Factor 3: Missing provenance ──
-    if not provenance_signals:
+    # C2PA unavailable
+    if p2_status in ["UNAVAILABLE", "ABSENT"]:
         factors.append(UncertaintyFactor(
-            factor="no_provenance",
-            description="No provenance information available. The original source could not be established.",
+            factor="no_c2pa_provenance",
+            description="No cryptographic C2PA provenance credentials detected in the content headers.",
             impact="moderate",
         ))
-        what_would_help.append("Original source or publication history of the media")
+        what_would_help.append("Cryptographic signature or C2PA manifest from the original publisher")
         uncertainty_score += 0.15
+    elif p2_status == "PRESENT_UNVERIFIED" or "unverified" in p2_status.lower():
+        factors.append(UncertaintyFactor(
+            factor="c2pa_unverified",
+            description="Cryptographic C2PA manifest is present but signatures could not be verified in this sandbox.",
+            impact="low",
+        ))
+        what_would_help.append("Verification in a secure runtime environment supporting full key-validation")
+        uncertainty_score += 0.05
+
+    # Metadata unavailable (P1)
+    if p1_status in ["UNAVAILABLE", "ABSENT"]:
+        factors.append(UncertaintyFactor(
+            factor="no_exif_metadata",
+            description="No camera capture metadata (EXIF) or software editing history is available.",
+            impact="low",
+        ))
+        what_would_help.append("Original, uncompressed file containing camera metadata headers")
+        uncertainty_score += 0.05
 
     # ── Factor 4: Media quality ──
     if media_analysis and media_analysis.media_quality in [MediaQuality.LOW, MediaQuality.VERY_LOW]:
@@ -84,27 +121,27 @@ def calculate_uncertainty(
             impact="moderate",
         ))
         what_would_help.append("Higher resolution version of the image/media")
-        uncertainty_score += 0.1
+        uncertainty_score += 0.10
 
     # ── Factor 5: Media analysis inconclusive ──
-    if media_analysis and media_analysis.media_authenticity.assessment == "unable_to_determine":
+    if p3_status == "UNVERIFIABLE":
         factors.append(UncertaintyFactor(
             factor="media_analysis_inconclusive",
-            description="Media authenticity could not be reliably assessed.",
+            description="Media authenticity could not be reliably assessed or is unverifiable.",
             impact="moderate",
         ))
         what_would_help.append("Original, uncompressed version of the media")
-        uncertainty_score += 0.1
+        uncertainty_score += 0.10
 
     # ── Factor 6: Context unverifiable ──
-    if media_analysis and media_analysis.context_consistency.assessment == "unverifiable":
+    if p6_status == "UNVERIFIABLE":
         factors.append(UncertaintyFactor(
             factor="context_unverifiable",
             description="The claimed context could not be verified or refuted with available information.",
             impact="moderate",
         ))
         what_would_help.append("Additional context about when and where the media was originally captured")
-        uncertainty_score += 0.1
+        uncertainty_score += 0.10
 
     # ── Factor 7: Temporal claim without verification ──
     if claim_has_time and not any(
@@ -127,7 +164,7 @@ def calculate_uncertainty(
                 impact="moderate",
             ))
             what_would_help.append("Evidence from government, academic, or major news sources")
-            uncertainty_score += 0.1
+            uncertainty_score += 0.10
 
     # ── Determine overall level ──
     if uncertainty_score >= 0.4:
@@ -146,8 +183,12 @@ def calculate_uncertainty(
     else:
         summary = f"Moderate uncertainty due to {len(factors)} factor(s). " + factors[0].description
 
+    # Calculate score percentage (clamped 0-100)
+    score_pct = int(min(1.0, max(0.0, uncertainty_score)) * 100)
+
     return UncertaintyResult(
         level=level,
+        score=score_pct,
         factors=factors,
         summary=summary,
         what_would_help=what_would_help,

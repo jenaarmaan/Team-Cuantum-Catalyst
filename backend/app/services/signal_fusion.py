@@ -303,42 +303,171 @@ def fuse_signals(
     evidence: List[EvidenceItem],
     media_analysis: Optional[MediaAnalysisResult],
     provenance_signals: List[ProvenanceSignal],
+    pillars: Optional[List] = None,
 ) -> AssessmentResult:
     """
     Combine all verification signals into a NYASA assessment.
-
     Returns a non-binary label + NYASA Confidence Score + ECS.
-    The confidence score is a weighted heuristic, NOT a calibrated probability.
     """
-    # Compute individual signal scores
-    evidence_score = _compute_evidence_strength(evidence)
-    source_score = _compute_source_consistency(evidence)
-    provenance_score = _compute_provenance_strength(provenance_signals)
-    media_score = _compute_media_score(media_analysis)
-    cross_source_score = _compute_cross_source_agreement(evidence)
+    # 1. Fallback to basic heuristics if pillars are not provided
+    if not pillars:
+        evidence_score = _compute_evidence_strength(evidence)
+        source_score = _compute_source_consistency(evidence)
+        provenance_score = _compute_provenance_strength(provenance_signals)
+        media_score = _compute_media_score(media_analysis)
+        cross_source_score = _compute_cross_source_agreement(evidence)
 
-    # Weighted fusion
+        raw_confidence = (
+            WEIGHTS["evidence_strength"] * evidence_score
+            + WEIGHTS["source_consistency"] * source_score
+            + WEIGHTS["provenance_strength"] * provenance_score
+            + WEIGHTS["media_analysis"] * media_score
+            + WEIGHTS["cross_source_agreement"] * cross_source_score
+        )
+        confidence = max(0.1, min(0.95, raw_confidence))
+        label, display_label = _determine_assessment_label(evidence, media_analysis, confidence)
+        ecs = compute_ecs(evidence, media_analysis, provenance_signals)
+        
+        # Build default media/context results
+        media_integrity_res = {"label": "UNCERTAIN", "score": 50, "confidence": 50}
+        context_integrity_res = {"label": "UNRESOLVED", "score": 50, "confidence": 50}
+        
+        res = AssessmentResult(
+            label=label,
+            display_label=display_label,
+            confidence=round(confidence, 2),
+            confidence_percent=int(round(confidence * 100)),
+            ecs=ecs,
+        )
+        res.media_integrity = media_integrity_res
+        res.context_integrity = context_integrity_res
+        return res
+
+    # 2. Extract detailed pillar metrics
+    p1 = next((p for p in pillars if p.pillar_id == "P1"), None)
+    p2 = next((p for p in pillars if p.pillar_id == "P2"), None)
+    p3 = next((p for p in pillars if p.pillar_id == "P3"), None)
+    p6 = next((p for p in pillars if p.pillar_id == "P6"), None)
+
+    p1_score = p1.signal_score if p1 else 50
+    p2_score = p2.signal_score if p2 else 50
+    p3_score = p3.signal_score if p3 else 50
+    p6_score = p6.signal_score if p6 else 50
+
+    p1_conf = p1.confidence if p1 else 50
+    p2_conf = p2.confidence if p2 else 50
+    p3_conf = p3.confidence if p3 else 50
+    p6_conf = p6.confidence if p6 else 50
+
+    # 3. Calculate Media Integrity (P1, P2, P3)
+    # Weights: P1 (15% if available, else 0%), P2 (20% if available, else 0%), P3 (30% if available, else 0%)
+    # If no media is provided, Media Integrity is NOT_APPLICABLE/UNCERTAIN.
+    has_media = (media_analysis is not None)
+    
+    if has_media:
+        # Weighted media score
+        media_score_val = int(round((p1_score * 0.2) + (p2_score * 0.3) + (p3_score * 0.5)))
+        media_conf_val = int(round((p1_conf * 0.2) + (p2_conf * 0.3) + (p3_conf * 0.5)))
+        
+        if media_score_val >= 60:
+            media_label = "LIKELY_AUTHENTIC"
+        elif media_score_val <= 45:
+            media_label = "LIKELY_MANIPULATED"
+        else:
+            media_label = "UNCERTAIN"
+    else:
+        media_score_val = 50
+        media_conf_val = 50
+        media_label = "UNCERTAIN"
+
+    media_integrity_res = {
+        "label": media_label,
+        "score": media_score_val,
+        "confidence": media_conf_val
+    }
+
+    # 4. Calculate Context Integrity (P6)
+    context_score_val = p6_score
+    context_conf_val = p6_conf
+    
+    p6_status = p6.status if p6 else "UNVERIFIABLE"
+    if p6_status == "MISLEADING_CONTEXT":
+        context_label = "MISLEADING_CONTEXT"
+    elif p6_status == "CONTRADICTED":
+        context_label = "CONTRADICTS"
+    elif p6_status == "SUPPORTED":
+        context_label = "SUPPORTED"
+    else:
+        context_label = "UNRESOLVED"
+
+    context_integrity_res = {
+        "label": context_label,
+        "score": context_score_val,
+        "confidence": context_conf_val
+    }
+
+    # 5. Combined Decision Tree (Milestone 2 Taxonomy)
+    display_label = "Inconclusive"
+    final_label = AssessmentLabel.INCONCLUSIVE
+
+    is_synthetic = False
+    if media_analysis:
+        auth_status = media_analysis.media_authenticity.assessment
+        if auth_status == "likely_synthetic":
+            is_synthetic = True
+
+    if has_media and media_label == "LIKELY_MANIPULATED":
+        if is_synthetic:
+            final_label = AssessmentLabel.LIKELY_SYNTHETIC
+            display_label = "Likely Synthetic (AI-Generated)"
+        else:
+            final_label = AssessmentLabel.LIKELY_MANIPULATED
+            display_label = "Likely Manipulated Image"
+    elif context_label == "CONTRADICTS":
+        final_label = AssessmentLabel.CLAIM_CONTRADICTED
+        display_label = "Claim Contradicted by Evidence"
+    elif has_media and media_label == "LIKELY_AUTHENTIC" and context_label == "SUPPORTED":
+        final_label = AssessmentLabel.LIKELY_AUTHENTIC_AND_SUPPORTED
+        display_label = "Likely Authentic & Supported"
+    elif has_media and media_label == "LIKELY_AUTHENTIC" and context_label == "MISLEADING_CONTEXT":
+        final_label = AssessmentLabel.LIKELY_AUTHENTIC_BUT_MISLEADING_CONTEXT
+        display_label = "Authentic Image, Misleading Context"
+    elif context_label == "SUPPORTED":
+        final_label = AssessmentLabel.LIKELY_SUPPORTED
+        display_label = "Likely Supported"
+    elif context_label == "UNRESOLVED":
+        if not evidence:
+            final_label = AssessmentLabel.INSUFFICIENT_EVIDENCE
+            display_label = "Insufficient Evidence"
+        else:
+            # Check for conflict
+            supporting = [e for e in evidence if e.stance == EvidenceStance.SUPPORTS]
+            contradicting = [e for e in evidence if e.stance == EvidenceStance.CONTRADICTS]
+            if supporting and contradicting:
+                final_label = AssessmentLabel.CONFLICTING_EVIDENCE
+                display_label = "Conflicting Evidence"
+            else:
+                final_label = AssessmentLabel.INCONCLUSIVE
+                display_label = "Inconclusive"
+
+    # Overall Confidence Calculation
+    # Weights: P1 (15%), P2 (20%), P3 (30%), P6 (35%)
     raw_confidence = (
-        WEIGHTS["evidence_strength"] * evidence_score
-        + WEIGHTS["source_consistency"] * source_score
-        + WEIGHTS["provenance_strength"] * provenance_score
-        + WEIGHTS["media_analysis"] * media_score
-        + WEIGHTS["cross_source_agreement"] * cross_source_score
+        0.15 * (float(p1_score) / 100.0)
+        + 0.20 * (float(p2_score) / 100.0)
+        + 0.30 * (float(p3_score) / 100.0)
+        + 0.35 * (float(p6_score) / 100.0)
     )
-
-    # Clamp to [0.1, 0.95] — never show 0% or 100%
     confidence = max(0.1, min(0.95, raw_confidence))
-
-    # Determine label
-    label, display_label = _determine_assessment_label(evidence, media_analysis, confidence)
-
-    # Calculate ECS (Evidence Credibility Score)
     ecs = compute_ecs(evidence, media_analysis, provenance_signals)
 
-    return AssessmentResult(
-        label=label,
+    res = AssessmentResult(
+        label=final_label,
         display_label=display_label,
         confidence=round(confidence, 2),
         confidence_percent=int(round(confidence * 100)),
         ecs=ecs,
     )
+    res.media_integrity = media_integrity_res
+    res.context_integrity = context_integrity_res
+    return res

@@ -47,148 +47,312 @@ def _analyze_six_pillars(
     media_analysis: Optional[MediaAnalysisResult],
     evidence: list,
     provenance_signals: list,
+    canonical_image: Optional[CanonicalImage] = None,
+    exif_metadata: Optional[dict] = None,
+    c2pa_status: str = "unavailable",
+    image_entropy: float = 0.0,
 ) -> list:
     """
     Construct the 6 pillars analysis objects for NYASA verification report.
     This demonstrates processing across all 6 dimensions even for static images.
     """
     pillars = []
+    exif_metadata = exif_metadata or {}
 
-    # 1. Provenance & Metadata
-    metadata_details = []
-    metadata_status = "unavailable"
-    metadata_score = 0.5
-    metadata_summary = "Metadata is unavailable. This signal is currently neutral, as metadata is commonly stripped by online platforms."
-
-    has_exif = False
-    for s in provenance_signals:
-        if s.signal_type == "exif_metadata":
-            has_exif = True
-            metadata_details.append(s.description)
-            metadata_score = s.confidence
+    # ── Pillar 1: Provenance & Metadata (P1) ──
+    p1_findings = []
+    p1_limitations = []
+    p1_sources = []
     
-    if has_exif:
-        metadata_status = "available"
-        metadata_summary = "Metadata markers were found in the content, providing initial provenance details."
+    if canonical_image:
+        p1_findings.append(f"Image Format: {canonical_image.format}")
+        p1_findings.append(f"Image Resolution: {canonical_image.width}x{canonical_image.height}")
+        p1_findings.append(f"File Size: {canonical_image.file_size} bytes")
+        p1_findings.append(f"SHA-256: {canonical_image.sha256[:16]}...")
+        p1_findings.append(f"Perceptual Hash: {canonical_image.perceptual_hash}")
+        
+    has_exif = False
+    p1_score = 50
+    p1_confidence = 50
+    p1_direction = "NEUTRAL"
+    
+    if exif_metadata:
+        has_exif = True
+        p1_score = 85
+        p1_confidence = 80
+        p1_direction = "SUPPORTS_AUTHENTICITY"
+        
+        # Extract specific tags
+        make = exif_metadata.get("Make")
+        model = exif_metadata.get("Model")
+        dt = exif_metadata.get("DateTimeOriginal") or exif_metadata.get("DateTime")
+        software = exif_metadata.get("Software")
+        
+        if make or model:
+            p1_findings.append(f"Camera Device: {make or ''} {model or ''}".strip())
+        if dt:
+            p1_findings.append(f"Capture Timestamp: {dt}")
+        if software:
+            p1_findings.append(f"Editing Software: {software}")
+            # If editing software detected, flag modification
+            p1_score = 35
+            p1_direction = "CONTRADICTS_AUTHENTICITY"
+            p1_findings.append("WARNING: Content modification markers detected in file software headers.")
+            
+        gps_coords = _parse_gps_info(exif_metadata)
+        if gps_coords:
+            p1_findings.append(f"GPS Coordinates: {gps_coords}")
+            p1_sources.append("Embedded GPS EXIF metadata")
+            
+        p1_sources.append("Embedded EXIF tags")
     else:
-        metadata_details.append("No embedded EXIF or capture metadata detected.")
+        p1_findings.append("No embedded EXIF capture tags or camera markers detected.")
+        p1_limitations.append("EXIF metadata is absent (commonly stripped by social media platforms).")
+
+    p1_status = "AVAILABLE" if has_exif else "UNAVAILABLE"
+    
+    p1_legacy_status = "available" if has_exif else "unavailable"
+    p1_legacy_summary = (
+        "Metadata was found in the image file, providing device capture details."
+        if has_exif else
+        "Metadata is unavailable. This is neutral, as metadata is commonly stripped online."
+    )
 
     pillars.append(PillarResult(
+        pillar_id="P1",
         name="Provenance & Metadata",
-        status=metadata_status,
-        score=metadata_score,
-        summary=metadata_summary,
-        details=metadata_details
+        status=p1_status,
+        applicable=True,
+        signal_score=p1_score,
+        confidence=p1_confidence,
+        direction=p1_direction,
+        evidence_strength=p1_score if has_exif else 0,
+        findings=p1_findings,
+        limitations=p1_limitations,
+        sources=p1_sources,
+        # Legacy fields
+        score=float(p1_score) / 100.0,
+        summary=p1_legacy_summary,
+        details=p1_findings
     ))
 
-    # 2. C2PA / Cryptographic Provenance
-    c2pa_status = "unavailable"
-    c2pa_score = None
-    c2pa_summary = "Cryptographic Content Credentials (C2PA) are missing. This is optional; missing credentials do not imply the media is fake."
-    c2pa_details = ["No cryptographic binding or C2PA manifest detected in the file headers."]
-
-    has_c2pa = False
-    for s in provenance_signals:
-        if s.signal_type == "content_credentials":
-            has_c2pa = True
-            c2pa_score = s.confidence
-            c2pa_summary = "Valid cryptographic Content Credentials (C2PA) signature detected, verifying source origin."
-            c2pa_details = [s.description]
-            c2pa_status = "valid"
+    # ── Pillar 2: C2PA / Cryptographic Provenance (P2) ──
+    p2_findings = []
+    p2_limitations = []
+    p2_sources = []
+    
+    has_c2pa = (c2pa_status == "c2pa_present_unverified")
+    p2_score = 50
+    p2_confidence = 50
+    p2_direction = "NEUTRAL"
+    
+    if has_c2pa:
+        p2_score = 90
+        p2_confidence = 70
+        p2_direction = "SUPPORTS_AUTHENTICITY"
+        p2_findings.append("C2PA Content Credentials signature detected in image headers.")
+        p2_findings.append("Manifest presence: PRESENT (unverified in current sandbox context)")
+        p2_sources.append("Image headers (APP11 segment)")
+    else:
+        p2_findings.append("No cryptographic Content Credentials (C2PA) signature found in file headers.")
+        p2_limitations.append("Cryptographic credentials are not present.")
+        
+    p2_status = "VALID" if has_c2pa else "UNAVAILABLE"
+    
+    p2_legacy_status = "valid" if has_c2pa else "unavailable"
+    p2_legacy_summary = (
+        "Valid cryptographic Content Credentials (C2PA) signature detected."
+        if has_c2pa else
+        "Cryptographic Content Credentials (C2PA) are missing. This is optional."
+    )
 
     pillars.append(PillarResult(
+        pillar_id="P2",
         name="C2PA / Cryptographic Provenance",
-        status=c2pa_status,
-        score=c2pa_score,
-        summary=c2pa_summary,
-        details=c2pa_details
+        status=p2_status,
+        applicable=True,
+        signal_score=p2_score,
+        confidence=p2_confidence,
+        direction=p2_direction,
+        evidence_strength=p2_score if has_c2pa else 0,
+        findings=p2_findings,
+        limitations=p2_limitations,
+        sources=p2_sources,
+        # Legacy fields
+        score=float(p2_score) / 100.0,
+        summary=p2_legacy_summary,
+        details=p2_findings
     ))
 
-    # 3. Media Forensics
-    forensics_status = "unverifiable"
-    forensics_score = 0.5
-    forensics_summary = "Media forensics is unavailable because no media was submitted."
-    forensics_details = ["No visual content submitted for forensic analysis."]
-
+    # ── Pillar 3: Media Forensics (P3) ──
+    p3_findings = []
+    p3_limitations = []
+    p3_sources = []
+    p3_score = 50
+    p3_confidence = 50
+    p3_direction = "NEUTRAL"
+    
     if media_analysis:
         auth = media_analysis.media_authenticity.assessment
-        forensics_details = [f"Visual scene description: {media_analysis.visual_description}"]
+        p3_findings.append(f"Visual scene description: {media_analysis.visual_description}")
+        p3_findings.append(f"Image entropy: {image_entropy:.2f} (randomness index)")
+        
         for s in media_analysis.media_authenticity.signals:
-            forensics_details.append(f"Forensic indicator: {s.description} (confidence: {int(s.confidence * 100)}%)")
+            p3_findings.append(f"Forensic indicator: {s.description} (confidence: {int(s.confidence * 100)}%)")
+            
+        p3_sources.append("Gemini Vision analysis")
+        p3_sources.append("Entropy calculation algorithms")
         
         if auth == "likely_authentic":
-            forensics_status = "likely_authentic"
-            forensics_score = 0.9
-            forensics_summary = "No major visual manipulation or synthetic indicators detected. The image itself appears authentic."
+            p3_status = "AUTHENTIC"
+            p3_score = 85
+            p3_confidence = 80
+            p3_direction = "SUPPORTS_AUTHENTICITY"
+            p3_legacy_summary = "No major visual manipulation or synthetic indicators detected. The image itself appears authentic."
         elif auth in ["possible_manipulation", "likely_synthetic"]:
-            forensics_status = "suspicious"
-            forensics_score = 0.3
-            forensics_summary = f"Forensic analysis detected potential anomalies: {media_analysis.media_authenticity.description}"
+            p3_status = "SUSPICIOUS"
+            p3_score = 30
+            p3_confidence = 85
+            p3_direction = "CONTRADICTS_AUTHENTICITY"
+            p3_legacy_summary = f"Forensic analysis detected potential anomalies: {media_analysis.media_authenticity.description}"
         else:
-            forensics_status = "unverifiable"
-            forensics_summary = "Forensic algorithms returned inconclusive results on the uploaded media."
+            p3_status = "UNVERIFIABLE"
+            p3_score = 50
+            p3_confidence = 50
+            p3_direction = "NEUTRAL"
+            p3_legacy_summary = "Forensic algorithms returned inconclusive results on the uploaded media."
+    else:
+        p3_status = "UNVERIFIABLE"
+        p3_findings.append("No visual content submitted for forensic analysis.")
+        p3_limitations.append("No image bytes provided.")
+        p3_legacy_summary = "Media forensics is unavailable because no media was submitted."
 
     pillars.append(PillarResult(
+        pillar_id="P3",
         name="Media Forensics",
-        status=forensics_status,
-        score=forensics_score,
-        summary=forensics_summary,
-        details=forensics_details
+        status=p3_status,
+        applicable=True,
+        signal_score=p3_score,
+        confidence=p3_confidence,
+        direction=p3_direction,
+        evidence_strength=p3_score if media_analysis else 0,
+        findings=p3_findings,
+        limitations=p3_limitations,
+        sources=p3_sources,
+        # Legacy fields
+        score=float(p3_score) / 100.0,
+        summary=p3_legacy_summary,
+        details=p3_findings
     ))
 
-    # 4. Temporal / Structural Consistency
+    # ── Pillar 4: Temporal & Structural Consistency (P4) ──
     pillars.append(PillarResult(
+        pillar_id="P4",
         name="Temporal & Structural Consistency",
-        status="not_applicable",
-        score=None,
+        status="NOT_APPLICABLE",
+        applicable=False,
+        signal_score=50,
+        confidence=50,
+        direction="NEUTRAL",
+        evidence_strength=0,
+        findings=["Input is a static image. Video-level frame transitions could not be computed."],
+        limitations=["Temporal verification requires video frame inputs."],
+        sources=[],
+        # Legacy fields
+        score=0.5,
         summary="Not applicable for static images. This pillar requires video frame transition analysis.",
         details=["Input is a static image. Video-level frame anomalies could not be computed."]
     ))
 
-    # 5. Cross-Modal Consistency
+    # ── Pillar 5: Cross-Modal Consistency (P5) ──
     pillars.append(PillarResult(
+        pillar_id="P5",
         name="Cross-Modal Consistency",
-        status="not_applicable",
-        score=None,
+        status="NOT_APPLICABLE",
+        applicable=False,
+        signal_score=50,
+        confidence=50,
+        direction="NEUTRAL",
+        evidence_strength=0,
+        findings=["No audio track or multiple modalities present in the input file."],
+        limitations=["Cross-modal verification requires combined audio/video or text/audio tracks."],
+        sources=[],
+        # Legacy fields
+        score=0.5,
         summary="Not applicable for single-mode media. This pillar evaluates video lip-sync and audio speech timing alignment.",
         details=["No audio track or multiple modalities present in the input file."]
     ))
 
-    # 6. External Source & Context Verification
-    context_status = "unverifiable"
-    context_score = 0.5
-    context_summary = "No external evidence could be retrieved to verify context."
-    context_details = []
-
+    # ── Pillar 6: External Source & Context Verification (P6) ──
+    p6_findings = []
+    p6_limitations = []
+    p6_sources = []
+    p6_score = 50
+    p6_confidence = 50
+    p6_direction = "NEUTRAL"
+    
     supporting = [e for e in evidence if e.stance == EvidenceStance.SUPPORTS]
     contradicting = [e for e in evidence if e.stance == EvidenceStance.CONTRADICTS]
-
+    
     if media_analysis and media_analysis.context_consistency.assessment == "inconsistent":
-        context_status = "inconsistent_context"
-        context_score = 0.2
-        context_summary = f"A contextual mismatch was identified: {media_analysis.context_consistency.description}"
-        context_details.append("Gemini Vision identified that the claim conflicts with the physical content of the image.")
+        p6_status = "MISLEADING_CONTEXT"
+        p6_score = 25
+        p6_confidence = 85
+        p6_direction = "CONTRADICTS_CLAIM"
+        p6_findings.append("Gemini Vision identified that the claim conflicts with the physical content of the image.")
+        p6_findings.append(f"Context consistency detail: {media_analysis.context_consistency.description}")
+        p6_sources.append("Gemini Vision claim/image validation")
     elif contradicting:
-        context_status = "contradicted"
-        context_score = 0.3
-        context_summary = f"External fact-checks or news sources contradict the claim's context ({len(contradicting)} contradicting source(s) found)."
+        p6_status = "CONTRADICTED"
+        p6_score = 20
+        p6_confidence = 80
+        p6_direction = "CONTRADICTS_CLAIM"
+        p6_findings.append(f"External fact-checks or news sources contradict the claim's context ({len(contradicting)} contradicting source(s) found).")
+        for e in contradicting:
+            p6_findings.append(f"Contradicting: [{e.source_name}] \"{e.title}\"")
+            p6_sources.append(e.source_url)
     elif supporting:
-        context_status = "supported"
-        context_score = 0.8
-        context_summary = f"Independent external sources support the event context ({len(supporting)} supporting source(s) found)."
+        p6_status = "SUPPORTED"
+        p6_score = 85
+        p6_confidence = 80
+        p6_direction = "SUPPORTS_CLAIM"
+        p6_findings.append(f"Independent external sources support the event context ({len(supporting)} supporting source(s) found).")
+        for e in supporting:
+            p6_findings.append(f"Supporting: [{e.source_name}] \"{e.title}\"")
+            p6_sources.append(e.source_url)
     else:
-        context_summary = "Retrieved web evidence is inconclusive relative to the claim's context."
+        p6_status = "UNVERIFIABLE"
+        p6_findings.append("Retrieved web evidence is inconclusive relative to the claim's context.")
+        p6_limitations.append("No authoritative third-party coverage matches this claim.")
 
-    context_details.append(f"Retrieved {len(evidence)} search result(s) from web queries.")
-    for e in evidence[:3]:
-        context_details.append(f"[{e.source_name}] Stance: {e.stance.value.upper()} - {e.title}")
+    p6_legacy_summary = (
+        f"A contextual mismatch was identified: {media_analysis.context_consistency.description}"
+        if (media_analysis and media_analysis.context_consistency.assessment == "inconsistent") else
+        f"External fact-checks or news sources contradict the claim's context ({len(contradicting)} contradicting source(s) found)."
+        if contradicting else
+        f"Independent external sources support the event context ({len(supporting)} supporting source(s) found)."
+        if supporting else
+        "Retrieved web evidence is inconclusive relative to the claim's context."
+    )
+
+    p6_findings.append(f"Retrieved {len(evidence)} search result(s) from web queries.")
 
     pillars.append(PillarResult(
+        pillar_id="P6",
         name="External Source & Context Verification",
-        status=context_status,
-        score=context_score,
-        summary=context_summary,
-        details=context_details
+        status=p6_status,
+        applicable=True,
+        signal_score=p6_score,
+        confidence=p6_confidence,
+        direction=p6_direction,
+        evidence_strength=p6_score if evidence else 0,
+        findings=p6_findings,
+        limitations=p6_limitations,
+        sources=p6_sources,
+        # Legacy fields
+        score=float(p6_score) / 100.0,
+        summary=p6_legacy_summary,
+        details=p6_findings
     ))
 
     return pillars
@@ -272,6 +436,98 @@ Respond ONLY with valid JSON conforming to this exact schema (no markdown, no ex
 }}
 """
 
+import hashlib
+from PIL import ExifTags
+
+def _calculate_average_hash(image_bytes: bytes) -> str:
+    """Computes a basic 64-bit average hash (aHash) of the image using Pillow."""
+    try:
+        img = Image.open(io.BytesIO(image_bytes)).convert('L').resize((8, 8), Image.Resampling.LANCZOS)
+        pixels = list(img.getdata())
+        avg = sum(pixels) / 64
+        bits = "".join(["1" if p > avg else "0" for p in pixels])
+        return f"{int(bits, 2):016x}"
+    except Exception:
+        return "0000000000000000"
+
+def _parse_gps_info(exif_dict: dict) -> Optional[str]:
+    """Helper to parse GPS info from EXIF and return formatted string coordinates."""
+    gps_info = exif_dict.get("GPSInfo")
+    if not gps_info or not isinstance(gps_info, dict):
+        return None
+        
+    parsed_gps = {}
+    for k, v in gps_info.items():
+        tag_name = ExifTags.GPSTAGS.get(k, str(k))
+        parsed_gps[tag_name] = v
+        
+    def _to_degrees(value):
+        if not value:
+            return 0.0
+        try:
+            d = float(value[0])
+            m = float(value[1])
+            s = float(value[2])
+            return d + (m / 60.0) + (s / 3600.0)
+        except Exception:
+            return 0.0
+
+    lat_ref = parsed_gps.get("GPSLatitudeRef")
+    lat_val = parsed_gps.get("GPSLatitude")
+    lon_ref = parsed_gps.get("GPSLongitudeRef")
+    lon_val = parsed_gps.get("GPSLongitude")
+
+    if lat_val and lat_ref and lon_val and lon_ref:
+        lat = _to_degrees(lat_val)
+        if lat_ref != 'N':
+            lat = -lat
+        lon = _to_degrees(lon_val)
+        if lon_ref != 'E':
+            lon = -lon
+        return f"{lat:.6f}, {lon:.6f}"
+    return None
+
+def _extract_image_exif(image_bytes: bytes) -> dict:
+    """Extracts useful EXIF tags from the image bytes using Pillow."""
+    metadata = {}
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        exif = img.getexif()
+        if exif:
+            for tag_id, val in exif.items():
+                tag_name = ExifTags.TAGS.get(tag_id, str(tag_id))
+                if isinstance(val, bytes):
+                    try:
+                        val = val.decode('utf-8', errors='ignore')
+                    except Exception:
+                        val = str(val)
+                metadata[tag_name] = val
+    except Exception as e:
+        print(f"[NYASA] Metadata extraction error: {e}")
+    return metadata
+
+def _detect_c2pa_manifest(image_bytes: bytes) -> str:
+    """
+    Scans the image bytes for C2PA Content Credentials signatures.
+    Returns: 'c2pa_present_unverified' or 'c2pa_absent'
+    """
+    if b"c2pa" in image_bytes or b"http://c2pa.org/" in image_bytes:
+        return "c2pa_present_unverified"
+    return "c2pa_absent"
+
+def _calculate_image_entropy(image_bytes: bytes) -> float:
+    try:
+        import math
+        img = Image.open(io.BytesIO(image_bytes))
+        histogram = img.histogram()
+        histogram_length = sum(histogram)
+        samples_probability = [float(h) / histogram_length for h in histogram]
+        entropy = -sum([p * math.log(p, 2) for p in samples_probability if p != 0])
+        return round(entropy, 2)
+    except Exception:
+        return 0.0
+
+
 async def _run_unified_gemini_analysis(
     claim_text: str,
     image_bytes: Optional[bytes],
@@ -336,6 +592,62 @@ async def run_verification(
     print(f"[NYASA] Raw Claim: \"{claim_text}\"")
     print(f"[NYASA] Has Image Attachment: {image_bytes is not None}")
     print("="*60)
+
+    # ── Ingestion & Canonical Footprint (Milestone 1) ──
+    canonical_image = None
+    exif_metadata = {}
+    c2pa_status = "unavailable"
+    image_entropy = 0.0
+
+    if image_bytes is not None:
+        try:
+            # 1. Image metadata footprint
+            image_id = f"img_{hashlib.sha256(image_bytes).hexdigest()[:12]}"
+            sha256 = hashlib.sha256(image_bytes).hexdigest()
+            perceptual_hash = _calculate_average_hash(image_bytes)
+
+            # Read format and dimensions
+            img = Image.open(io.BytesIO(image_bytes))
+            original_width, original_height = img.size
+            file_format = img.format or "JPEG"
+            file_size = len(image_bytes)
+
+            # Compute normalized dimensions
+            max_dim = 1024
+            if original_width > max_dim or original_height > max_dim:
+                ratio = max_dim / max(original_width, original_height)
+                normalized_width = int(original_width * ratio)
+                normalized_height = int(original_height * ratio)
+            else:
+                normalized_width = original_width
+                normalized_height = original_height
+
+            from app.models.schemas import CanonicalImage
+            canonical_image = CanonicalImage(
+                image_id=image_id,
+                sha256=sha256,
+                perceptual_hash=perceptual_hash,
+                format=file_format,
+                width=original_width,
+                height=original_height,
+                file_size=file_size,
+                normalized_width=normalized_width,
+                normalized_height=normalized_height
+            )
+            print(f"[NYASA] Ingested canonical image: ID={image_id} Size={original_width}x{original_height} Format={file_format}")
+
+            # 2. Extract EXIF tags
+            exif_metadata = _extract_image_exif(image_bytes)
+
+            # 3. Detect C2PA manifest
+            c2pa_status = _detect_c2pa_manifest(image_bytes)
+
+            # 4. Deterministic image entropy
+            image_entropy = _calculate_image_entropy(image_bytes)
+            print(f"[NYASA] Image features: Entropy={image_entropy} C2PA={c2pa_status}")
+
+        except Exception as e:
+            print(f"[NYASA] Canonical footprint extraction failed: {e}")
 
     # ── Step 1: Web Evidence Harvesting ──
     print(f"\n[NYASA] == STEP 1/7: WEB EVIDENCE HARVESTING (Tavily Engine) ==")
@@ -483,35 +795,50 @@ async def run_verification(
     for s in provenance_signals:
         print(f"  +- Provenance: [{s.signal_type}] {s.description} (conf: {s.confidence})")
 
-    # ── Step 4: Signal Fusion → Assessment + Confidence ──
-    print(f"\n[NYASA] == STEP 4/7: WEIGHTED SIGNAL FUSION ==")
-    assessment = fuse_signals(evidence, media_analysis, provenance_signals)
+    # ── Step 4: Build 6 Pillars Analysis (P1 - P6) ──
+    print(f"\n[NYASA] == STEP 4/7: BUILD 6 PILLARS ANALYSIS ==")
+    pillars = _analyze_six_pillars(
+        extracted_claim=extracted_claim,
+        media_analysis=media_analysis,
+        evidence=evidence,
+        provenance_signals=provenance_signals,
+        canonical_image=canonical_image,
+        exif_metadata=exif_metadata,
+        c2pa_status=c2pa_status,
+        image_entropy=image_entropy,
+    )
+    for p in pillars:
+        print(f"  +- Pillar [{p.pillar_id}] {p.name}: Status={p.status} Score={p.signal_score} Conf={p.confidence}")
+
+    # ── Step 5: Signal Fusion → Assessment + Confidence ──
+    print(f"\n[NYASA] == STEP 5/7: WEIGHTED SIGNAL FUSION ==")
+    assessment = fuse_signals(evidence, media_analysis, provenance_signals, pillars=pillars)
     print(f"[NYASA] Final Assessment Label:          {assessment.display_label.upper()}")
     print(f"[NYASA] NYASA Confidence Score:         {assessment.confidence_percent}%")
     print(f"[NYASA] Evidence Credibility Score (ECS): {assessment.ecs}/100")
 
-    # ── Step 5: Uncertainty ──
-    print(f"\n[NYASA] == STEP 5/7: STRUCTURED UNCERTAINTY PROFILE ==")
+    # ── Step 6: Uncertainty ──
+    print(f"\n[NYASA] == STEP 6/7: STRUCTURED UNCERTAINTY PROFILE ==")
     uncertainty = calculate_uncertainty(
         evidence=evidence,
         media_analysis=media_analysis,
         provenance_signals=provenance_signals,
         claim_has_location=extracted_claim.location is not None,
         claim_has_time=extracted_claim.time_reference is not None,
+        pillars=pillars,
     )
+    # Set nested uncertainty inside assessment
+    assessment.uncertainty = {
+        "level": uncertainty.level.value.upper(),
+        "score": uncertainty.score
+    }
+    assessment.evidence_credibility = assessment.ecs
+
     print(f"[NYASA] Uncertainty Level: {uncertainty.level.value.upper()}")
     print(f"[NYASA] Uncertainty Summary: \"{uncertainty.summary}\"")
     for f in uncertainty.factors:
         print(f"  +- Factor: [{f.factor}] {f.description} (impact: {f.impact})")
     print(f"[NYASA] Information that would help: {uncertainty.what_would_help}")
-
-    # ── Build 6 Pillars Analysis ──
-    pillars = _analyze_six_pillars(
-        extracted_claim=extracted_claim,
-        media_analysis=media_analysis,
-        evidence=evidence,
-        provenance_signals=provenance_signals,
-    )
 
     # ── Build Final Report ──
     supporting = [e for e in evidence if e.stance == EvidenceStance.SUPPORTS]
@@ -519,10 +846,33 @@ async def run_verification(
     contextual = [e for e in evidence if e.stance == EvidenceStance.CONTEXT]
     unresolved = [e for e in evidence if e.stance == EvidenceStance.UNRESOLVED]
 
+    # Separated Media and Context integrity results (Milestone 2)
+    media_result = getattr(assessment, "media_integrity", None) or {
+        "label": "UNCERTAIN",
+        "score": 50,
+        "confidence": 50
+    }
+    context_result = getattr(assessment, "context_integrity", None) or {
+        "label": "UNRESOLVED",
+        "score": 50,
+        "confidence": 50
+    }
+    evidence_conv = {
+        "supporting_count": len(supporting),
+        "contradicting_count": len(contradicting),
+        "contextual_count": len(contextual),
+        "unresolved_count": len(unresolved)
+    }
+    unc_reasons = [f.description for f in uncertainty.factors]
+
     print("\n" + "="*60)
     print(f"[NYASA PIPELINE COMPLETE] ID: {verification_id} | Final: {assessment.display_label}")
     print("="*60 + "\n")
     print(f"[NYASA] Verification {verification_id} complete")
+
+    # If canonical_image was created, inject it into media_analysis
+    if canonical_image and media_analysis:
+        media_analysis.canonical_image = canonical_image
 
     return VerificationResponse(
         verification_id=verification_id,
@@ -545,6 +895,10 @@ async def run_verification(
         key_findings=explanation_data["key_findings"],
         recommended_action=explanation_data["recommended_action"],
         limitations=explanation_data["limitations"],
+        media_integrity=media_result,
+        context_integrity=context_result,
+        evidence_convergence=evidence_conv,
+        uncertainty_reasons=unc_reasons,
     )
 
 

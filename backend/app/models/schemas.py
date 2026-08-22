@@ -26,6 +26,14 @@ class AssessmentLabel(str, Enum):
     STRONGLY_CONTRADICTED = "strongly_contradicted"
     MANIPULATION_SIGNALS_DETECTED = "manipulation_signals_detected"
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    
+    # Milestone 2 New Taxonomy Outcomes
+    LIKELY_AUTHENTIC_AND_SUPPORTED = "likely_authentic_and_supported"
+    LIKELY_AUTHENTIC_BUT_MISLEADING_CONTEXT = "likely_authentic_but_misleading_context"
+    LIKELY_MANIPULATED = "likely_manipulated"
+    LIKELY_SYNTHETIC = "likely_synthetic"
+    CLAIM_CONTRADICTED = "claim_contradicted"
+    CONFLICTING_EVIDENCE = "conflicting_evidence"
 
 
 class UncertaintyLevel(str, Enum):
@@ -108,6 +116,7 @@ class MediaAnalysisResult(BaseModel):
     visual_description: str = Field("", description="What the image/media depicts")
     ocr_text: Optional[str] = Field(None, description="Text extracted via OCR if present")
     media_quality: MediaQuality = Field(MediaQuality.MODERATE)
+    canonical_image: Optional[CanonicalImage] = None
 
 
 # ─── Provenance Signals ───
@@ -155,6 +164,7 @@ class UncertaintyFactor(BaseModel):
 class UncertaintyResult(BaseModel):
     """Structured uncertainty — not a generic disclaimer."""
     level: UncertaintyLevel = Field(...)
+    score: Optional[int] = Field(0, ge=0, le=100, description="Numerical uncertainty index (0-100)")
     factors: List[UncertaintyFactor] = Field(default_factory=list)
     summary: str = Field(..., description="One-sentence uncertainty summary")
     what_would_help: List[str] = Field(
@@ -165,13 +175,38 @@ class UncertaintyResult(BaseModel):
 
 # ─── 6 Pillars of NYASA ───
 
+class CanonicalImage(BaseModel):
+    """Normalized image representation details."""
+    image_id: str = Field(..., description="Unique image identifier")
+    sha256: str = Field(..., description="SHA-256 cryptographic hash of image bytes")
+    perceptual_hash: str = Field(..., description="Average perceptual hash (aHash) of visual content")
+    format: str = Field(..., description="File format (e.g. JPEG, PNG)")
+    width: int = Field(..., description="Original image width")
+    height: int = Field(..., description="Original image height")
+    file_size: int = Field(..., description="Original file size in bytes")
+    normalized_width: int = Field(..., description="Resized width used for analysis")
+    normalized_height: int = Field(..., description="Resized height used for analysis")
+
+
 class PillarResult(BaseModel):
     """One of the 6 pillars of NYASA's evidence-based verification architecture."""
+    # Standardized Milestone 1 & 2 fields
+    pillar_id: str = Field(..., description="Pillar identifier, e.g. P1, P2")
     name: str = Field(..., description="Name of the pillar")
-    status: str = Field(..., description="Status description (e.g. 'available', 'suspicious', 'valid')")
-    score: Optional[float] = Field(None, description="Score associated with the pillar (0.0 to 1.0) if applicable")
-    summary: str = Field(..., description="Summary explanation of findings for this pillar")
-    details: List[str] = Field(default_factory=list, description="Specific details/signals extracted for this pillar")
+    status: str = Field(..., description="Status description (e.g. 'AVAILABLE', 'UNAVAILABLE', 'NOT_APPLICABLE')")
+    applicable: bool = Field(True, description="Whether this pillar is applicable to the current media format")
+    signal_score: int = Field(50, ge=0, le=100, description="Pillar signal strength (0-100)")
+    confidence: int = Field(0, ge=0, le=100, description="Pillar confidence score (0-100)")
+    direction: str = Field("NEUTRAL", description="E.g. SUPPORTS_AUTHENTICITY, CONTRADICTS_CLAIM, NEUTRAL")
+    evidence_strength: int = Field(0, ge=0, le=100, description="Pillar evidence strength score (0-100)")
+    findings: List[str] = Field(default_factory=list, description="Specific findings list")
+    limitations: List[str] = Field(default_factory=list, description="Specific limitations list")
+    sources: List[str] = Field(default_factory=list, description="Evidence sources list")
+
+    # Legacy fields to preserve frontend UI compatibility
+    score: Optional[float] = Field(None, description="Legacy score (0.0 to 1.0) if applicable")
+    summary: str = Field("", description="Legacy summary explanation of findings for this pillar")
+    details: List[str] = Field(default_factory=list, description="Legacy specific details/signals list")
 
 
 # ─── Final Assessment ───
@@ -180,15 +215,18 @@ class AssessmentResult(BaseModel):
     """
     The complete NYASA assessment.
     Confidence is a 'NYASA Confidence Score' derived from weighted verification signals.
-    It is NOT a scientifically calibrated probability.
-    
-    ECS (Evidence Credibility Score) measures the quality and coverage of the evidence.
     """
     label: AssessmentLabel = Field(...)
     display_label: str = Field(..., description="Human-readable label, e.g. 'Likely Misleading'")
     confidence: float = Field(..., ge=0.0, le=1.0, description="NYASA Confidence Score (0-1)")
     confidence_percent: int = Field(..., ge=0, le=100, description="Confidence as percentage for display")
     ecs: int = Field(..., ge=0, le=100, description="Evidence Credibility Score (ECS) from 0 to 100")
+    
+    # Milestone 2 fields
+    evidence_credibility: Optional[int] = Field(None, ge=0, le=100, description="Duplicate of ECS for schema matching")
+    uncertainty: Optional[dict] = Field(None, description="Nested uncertainty fields (level, score)")
+    media_integrity: Optional[dict] = Field(None, description="Separated media integrity result")
+    context_integrity: Optional[dict] = Field(None, description="Separated context consistency result")
 
 
 # ─── Complete Verification Response ───
@@ -227,6 +265,12 @@ class VerificationResponse(BaseModel):
     key_findings: List[str] = Field(default_factory=list, description="Bullet-point findings")
     recommended_action: str = Field(...)
     limitations: List[str] = Field(default_factory=list)
+
+    # Milestone 2 score & metadata transparency fields
+    media_integrity: Optional[dict] = Field(None, description="Separated media integrity result")
+    context_integrity: Optional[dict] = Field(None, description="Separated context consistency result")
+    evidence_convergence: Optional[dict] = Field(None, description="Summary counts of supporting/contradicting/unknown signals")
+    uncertainty_reasons: List[str] = Field(default_factory=list, description="List of reasons for uncertainty")
 
     # Scoring transparency
     scoring_note: str = Field(

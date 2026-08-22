@@ -12,7 +12,13 @@ export type AssessmentLabel =
   | 'likely_misleading'
   | 'strongly_contradicted'
   | 'manipulation_signals_detected'
-  | 'insufficient_evidence';
+  | 'insufficient_evidence'
+  | 'likely_authentic_and_supported'
+  | 'likely_authentic_but_misleading_context'
+  | 'likely_manipulated'
+  | 'likely_synthetic'
+  | 'claim_contradicted'
+  | 'conflicting_evidence';
 
 export type UncertaintyLevel = 'low' | 'moderate' | 'high';
 
@@ -111,6 +117,7 @@ export interface UncertaintyFactor {
 
 export interface UncertaintyResult {
   level: UncertaintyLevel;
+  score: number;
   factors: UncertaintyFactor[];
   summary: string;
   what_would_help: string[];
@@ -119,11 +126,26 @@ export interface UncertaintyResult {
 // ─── 6 Pillars of NYASA ───
 
 export interface PillarResult {
+  pillar_id: string;
   name: string;
   status: string;
+  applicable: boolean;
+  signal_score: number;
+  confidence: number;
+  direction: string;
+  evidence_strength: number;
+  findings: string[];
+  limitations: string[];
+  sources: string[];
+  
+  // Legacy fields
   score: number | null;
   summary: string;
   details: string[];
+
+  // Geographic evidence fields
+  claimed_location?: { lat: number; lng: number; label: string } | null;
+  evidence_locations?: Array<{ lat: number; lng: number; label: string; source: string; date: string | null; relation: 'matches' | 'contradicts' }> | [];
 }
 
 // ── Assessment ──
@@ -213,6 +235,44 @@ export const ASSESSMENT_CONFIGS: Record<AssessmentLabel, AssessmentConfig> = {
     bgColor: 'rgba(107, 114, 128, 0.1)',
     icon: '⚪',
     label: 'Insufficient Evidence',
+  },
+  
+  // New Taxonomy Outcome mappings
+  likely_authentic_and_supported: {
+    color: '#10b981',
+    bgColor: 'rgba(16, 185, 129, 0.1)',
+    icon: '🟢',
+    label: 'Likely Authentic & Supported',
+  },
+  likely_authentic_but_misleading_context: {
+    color: '#f59e0b',
+    bgColor: 'rgba(245, 158, 11, 0.1)',
+    icon: '🟠',
+    label: 'Authentic Image, Misleading Context',
+  },
+  likely_manipulated: {
+    color: '#ef4444',
+    bgColor: 'rgba(239, 68, 68, 0.1)',
+    icon: '🔴',
+    label: 'Likely Manipulated Image',
+  },
+  likely_synthetic: {
+    color: '#ec4899',
+    bgColor: 'rgba(236, 72, 153, 0.1)',
+    icon: '🤖',
+    label: 'Likely Synthetic (AI-Generated)',
+  },
+  claim_contradicted: {
+    color: '#ef4444',
+    bgColor: 'rgba(239, 68, 68, 0.1)',
+    icon: '🔴',
+    label: 'Claim Contradicted by Evidence',
+  },
+  conflicting_evidence: {
+    color: '#8b5cf6',
+    bgColor: 'rgba(139, 92, 246, 0.1)',
+    icon: '🟣',
+    label: 'Conflicting Evidence',
   },
 };
 
