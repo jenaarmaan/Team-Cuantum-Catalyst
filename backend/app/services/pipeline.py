@@ -205,48 +205,76 @@ async def run_verification(
     verification_id = f"nyasa_{uuid.uuid4().hex[:12]}"
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    print(f"[NYASA] Starting verification {verification_id}")
+    print("\n" + "="*60)
+    print(f"[NYASA PIPELINE INITIALIZED] ID: {verification_id} | Time: {timestamp}")
+    print(f"[NYASA] Raw Claim: \"{claim_text}\"")
+    print(f"[NYASA] Has Image Attachment: {image_bytes is not None}")
+    print("="*60)
 
     # ── Step 1: Claim Extraction ──
-    print(f"[NYASA] Step 1/7: Extracting claim...")
+    print(f"\n[NYASA] ── STEP 1/7: CLAIM EXTRACTION (Gemini NLP) ──")
     extracted_claim = await extract_claim(claim_text)
-    print(f"[NYASA] Claim extracted: {extracted_claim.key_assertion}")
+    print(f"[NYASA] Normalized Claim: \"{extracted_claim.normalized_claim}\"")
+    print(f"[NYASA] Key Assertion:    \"{extracted_claim.key_assertion}\"")
+    print(f"[NYASA] Key Entities:     {extracted_claim.entities}")
+    print(f"[NYASA] Event Type:       {extracted_claim.event_type}")
+    print(f"[NYASA] Location Context:  {extracted_claim.location}")
+    print(f"[NYASA] Time Reference:   {extracted_claim.time_reference}")
+    print(f"[NYASA] Atomic Claims:    {extracted_claim.atomic_claims}")
 
     # ── Step 2: Media Analysis (if image provided) ──
     media_analysis = None
     if image_bytes:
-        print(f"[NYASA] Step 2/7: Analyzing media...")
+        print(f"\n[NYASA] ── STEP 2/7: MEDIA FORENSICS & CONTEXT AUDIT (Gemini Vision) ──")
         media_analysis = await analyze_media(image_bytes, claim_text)
-        print(f"[NYASA] Media: auth={media_analysis.media_authenticity.assessment}, "
-              f"context={media_analysis.context_consistency.assessment}")
+        print(f"[NYASA] Scene Description:  \"{media_analysis.visual_description}\"")
+        print(f"[NYASA] OCR Text Detected:  \"{media_analysis.ocr_text}\"")
+        print(f"[NYASA] Media Quality:      {media_analysis.media_quality.value}")
+        print(f"[NYASA] Media Authenticity: {media_analysis.media_authenticity.assessment.upper()}")
+        for s in media_analysis.media_authenticity.signals:
+            print(f"  └─ Signal: [{s.signal_type}] {s.description} (conf: {s.confidence})")
+        print(f"[NYASA] Context Consistency: {media_analysis.context_consistency.assessment.upper()}")
+        for s in media_analysis.context_consistency.signals:
+            print(f"  └─ Signal: [{s.signal_type}] {s.description} (conf: {s.confidence})")
     else:
-        print(f"[NYASA] Step 2/7: No media provided, skipping...")
+        print(f"\n[NYASA] ── STEP 2/7: MEDIA ANALYSIS (Skipped: No Image Uploaded) ──")
 
     # ── Step 3: Evidence Retrieval ──
-    print(f"[NYASA] Step 3/7: Retrieving web evidence...")
+    print(f"\n[NYASA] ── STEP 3/7: WEB EVIDENCE HARVESTING (Tavily Engine) ──")
     evidence = await retrieve_evidence(
         claim_text=extracted_claim.normalized_claim,
         location=extracted_claim.location,
         event_type=extracted_claim.event_type,
         entities=extracted_claim.entities,
     )
-    print(f"[NYASA] Retrieved {len(evidence)} evidence items")
+    print(f"[NYASA] Harvested {len(evidence)} unique URLs from search queries.")
 
     # ── Step 4: Evidence Ranking & Classification ──
-    print(f"[NYASA] Step 4/7: Classifying evidence stance...")
+    print(f"\n[NYASA] ── STEP 4/7: STANCE CLASSIFICATION & RANKING (Gemini Analyst) ──")
     evidence = await rank_evidence(evidence, extracted_claim.normalized_claim)
+    for idx, e in enumerate(evidence, 1):
+        print(f"  [{idx}] Source: {e.source_name} ({e.source_type.value})")
+        print(f"      Title:  \"{e.title}\"")
+        print(f"      Stance: {e.stance.value.upper()} (relevance: {e.relevance_score}, authority: {e.authority_score})")
+        print(f"      Reason: \"{e.stance_reasoning}\"")
 
     # ── Step 5: Build Provenance Signals ──
-    # Tavily search results are "discovered historical occurrences", NOT verified provenance
-    print(f"[NYASA] Step 5/7: Analyzing provenance signals...")
+    print(f"\n[NYASA] ── STEP 5/7: PROVENANCE RECONSTRUCTION ──")
     provenance_signals = _extract_provenance_signals(evidence, media_analysis)
+    if not provenance_signals:
+        print("[NYASA] No explicit provenance signals constructed.")
+    for s in provenance_signals:
+        print(f"  └─ Provenance: [{s.signal_type}] {s.description} (conf: {s.confidence})")
 
     # ── Step 6: Signal Fusion → Assessment + Confidence ──
-    print(f"[NYASA] Step 6/7: Fusing signals...")
+    print(f"\n[NYASA] ── STEP 6/7: WEIGHTED SIGNAL FUSION ──")
     assessment = fuse_signals(evidence, media_analysis, provenance_signals)
-    print(f"[NYASA] Assessment: {assessment.display_label} ({assessment.confidence_percent}%)")
+    print(f"[NYASA] Final Assessment Label:          {assessment.display_label.upper()}")
+    print(f"[NYASA] NYASA Confidence Score:         {assessment.confidence_percent}%")
+    print(f"[NYASA] Evidence Credibility Score (ECS): {assessment.ecs}/100")
 
     # ── Step 6b: Uncertainty ──
+    print(f"\n[NYASA] ── STEP 6B/7: STRUCTURED UNCERTAINTY PROFILE ──")
     uncertainty = calculate_uncertainty(
         evidence=evidence,
         media_analysis=media_analysis,
@@ -254,10 +282,14 @@ async def run_verification(
         claim_has_location=extracted_claim.location is not None,
         claim_has_time=extracted_claim.time_reference is not None,
     )
-    print(f"[NYASA] Uncertainty: {uncertainty.level.value}")
+    print(f"[NYASA] Uncertainty Level: {uncertainty.level.value.upper()}")
+    print(f"[NYASA] Uncertainty Summary: \"{uncertainty.summary}\"")
+    for f in uncertainty.factors:
+        print(f"  └─ Factor: [{f.factor}] {f.description} (impact: {f.impact})")
+    print(f"[NYASA] Information that would help: {uncertainty.what_would_help}")
 
     # ── Step 7: Evidence-Grounded Explanation ──
-    print(f"[NYASA] Step 7/7: Generating explanation...")
+    print(f"\n[NYASA] ── STEP 7/7: REPORT SYNTHESIS (Gemini Explanation) ──")
     explanation_data = await generate_explanation(
         extracted_claim=extracted_claim,
         assessment=assessment,
@@ -266,6 +298,10 @@ async def run_verification(
         provenance_signals=provenance_signals,
         uncertainty=uncertainty,
     )
+    print(f"[NYASA] Grounded Explanation: \"{explanation_data['explanation']}\"")
+    print(f"[NYASA] Recommended Action:   \"{explanation_data['recommended_action']}\"")
+    print(f"[NYASA] Key Findings:         {explanation_data['key_findings']}")
+    print(f"[NYASA] Limitations:          {explanation_data['limitations']}")
 
     # ── Build 6 Pillars Analysis ──
     pillars = _analyze_six_pillars(
@@ -281,6 +317,9 @@ async def run_verification(
     contextual = [e for e in evidence if e.stance == EvidenceStance.CONTEXT]
     unresolved = [e for e in evidence if e.stance == EvidenceStance.UNRESOLVED]
 
+    print("\n" + "="*60)
+    print(f"[NYASA PIPELINE COMPLETE] ID: {verification_id} | Final: {assessment.display_label}")
+    print("="*60 + "\n")
     print(f"[NYASA] Verification {verification_id} complete")
 
     return VerificationResponse(

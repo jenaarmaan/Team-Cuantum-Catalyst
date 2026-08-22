@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     tavily_api_key: str = ""
 
     # Model Configuration
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-3.6-flash"
 
     # Server Configuration
     host: str = "0.0.0.0"
