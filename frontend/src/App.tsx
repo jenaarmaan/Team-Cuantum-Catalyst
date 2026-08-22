@@ -154,7 +154,6 @@ function App() {
                 </div>
                 
                 <h1 className="text-4xl md:text-5xl font-extrabold text-nyasa-text mb-6 tracking-tight leading-tight max-w-3xl mx-auto">
-                  SynthID & C2PA verify origin. <br />
                   <span className="text-nyasa-primary">NYASA verifies if you can trust the claim.</span>
                 </h1>
                 
