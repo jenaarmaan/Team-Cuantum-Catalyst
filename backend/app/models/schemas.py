@@ -10,6 +10,7 @@ Key design decisions:
 - Uncertainty is structured, not a generic disclaimer
 """
 
+from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from enum import Enum
