@@ -610,7 +610,12 @@ async def _run_unified_gemini_analysis(
     # Strip trailing commas
     cleaned_json = re.sub(r',\s*([\]}])', r'\1', cleaned_json)
     
-    return json.loads(cleaned_json)
+    try:
+        return json.loads(cleaned_json)
+    except Exception as e:
+        print(f"[NYASA] JSON parse error: {e}")
+        print(f"[NYASA] Raw model response text:\n{response_text}")
+        raise e
 
 
 async def run_verification(
