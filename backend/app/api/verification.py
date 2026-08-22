@@ -83,6 +83,9 @@ async def verify_content(
         # Read and validate size
         try:
             image_bytes = await image.read()
+            print(f"[INGESTION] filename={image.filename}")
+            print(f"[INGESTION] content_type={image.content_type}")
+            print(f"[INGESTION] bytes={len(image_bytes)}")
         except Exception:
             return JSONResponse(
                 status_code=400,

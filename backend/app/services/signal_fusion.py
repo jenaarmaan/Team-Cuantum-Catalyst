@@ -354,21 +354,46 @@ def fuse_signals(
     p3_score = p3.signal_score if p3 else 50
     p6_score = p6.signal_score if p6 else 50
 
-    p1_conf = p1.confidence if p1 else 50
-    p2_conf = p2.confidence if p2 else 50
-    p3_conf = p3.confidence if p3 else 50
-    p6_conf = p6.confidence if p6 else 50
+    p1_conf = p1.confidence if p1 else 0
+    p2_conf = p2.confidence if p2 else 0
+    p3_conf = p3.confidence if p3 else 0
+    p6_conf = p6.confidence if p6 else 0
+
+    p1_active = (p1 is not None and p1.confidence > 0)
+    p2_active = (p2 is not None and p2.confidence > 0)
+    p3_active = (p3 is not None and p3.confidence > 0)
+    p6_active = (p6 is not None and p6.confidence > 0)
 
     # 3. Calculate Media Integrity (P1, P2, P3)
-    # Weights: P1 (15% if available, else 0%), P2 (20% if available, else 0%), P3 (30% if available, else 0%)
     # If no media is provided, Media Integrity is NOT_APPLICABLE/UNCERTAIN.
     has_media = (media_analysis is not None)
     
     if has_media:
-        # Weighted media score
-        media_score_val = int(round((p1_score * 0.2) + (p2_score * 0.3) + (p3_score * 0.5)))
-        media_conf_val = int(round((p1_conf * 0.2) + (p2_conf * 0.3) + (p3_conf * 0.5)))
+        # Weighted media score based on active signals
+        media_weight = 0.0
+        media_sum = 0.0
+        conf_sum = 0.0
         
+        if p1_active:
+            media_weight += 0.2
+            media_sum += p1_score * 0.2
+            conf_sum += p1_conf * 0.2
+        if p2_active:
+            media_weight += 0.3
+            media_sum += p2_score * 0.3
+            conf_sum += p2_conf * 0.3
+        if p3_active:
+            media_weight += 0.5
+            media_sum += p3_score * 0.5
+            conf_sum += p3_conf * 0.5
+            
+        if media_weight > 0:
+            media_score_val = int(round(media_sum / media_weight))
+            media_conf_val = int(round(conf_sum / media_weight))
+        else:
+            media_score_val = 50
+            media_conf_val = 0
+            
         if media_score_val >= 60:
             media_label = "LIKELY_AUTHENTIC"
         elif media_score_val <= 45:
@@ -377,7 +402,7 @@ def fuse_signals(
             media_label = "UNCERTAIN"
     else:
         media_score_val = 50
-        media_conf_val = 50
+        media_conf_val = 0
         media_label = "UNCERTAIN"
 
     media_integrity_res = {
@@ -452,12 +477,28 @@ def fuse_signals(
 
     # Overall Confidence Calculation
     # Weights: P1 (15%), P2 (20%), P3 (30%), P6 (35%)
-    raw_confidence = (
-        0.15 * (float(p1_score) / 100.0)
-        + 0.20 * (float(p2_score) / 100.0)
-        + 0.30 * (float(p3_score) / 100.0)
-        + 0.35 * (float(p6_score) / 100.0)
-    )
+    # Computed dynamically based on available metrics
+    total_weight = 0.0
+    weighted_score_sum = 0.0
+    
+    if p1_active:
+        total_weight += 0.15
+        weighted_score_sum += 0.15 * (float(p1_score) / 100.0)
+    if p2_active:
+        total_weight += 0.20
+        weighted_score_sum += 0.20 * (float(p2_score) / 100.0)
+    if p3_active:
+        total_weight += 0.30
+        weighted_score_sum += 0.30 * (float(p3_score) / 100.0)
+    if p6_active:
+        total_weight += 0.35
+        weighted_score_sum += 0.35 * (float(p6_score) / 100.0)
+        
+    if total_weight > 0:
+        raw_confidence = weighted_score_sum / total_weight
+    else:
+        raw_confidence = 0.5
+
     confidence = max(0.1, min(0.95, raw_confidence))
     ecs = compute_ecs(evidence, media_analysis, provenance_signals)
 

@@ -98,8 +98,34 @@ async def retrieve_evidence(
     Retrieve web evidence for a claim using Tavily Search.
     Returns normalized EvidenceItems with source metadata and retrieval timestamps.
     """
+    import os
+    tavily_key = settings.tavily_api_key or os.getenv("TAVILY_API_KEY")
+    if not tavily_key or tavily_key.strip() == "":
+        print("[NYASA] Tavily Search skipped: API credentials are not configured.")
+        return []
+
+    # Local fallback parsing if no location/entities are passed to generate high-quality search queries
+    if not location or not event_type or not entities:
+        import re
+        if not location:
+            loc_match = re.search(r'\b(?:in|at|near|from)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', claim_text)
+            if loc_match:
+                location = loc_match.group(1)
+        
+        if not event_type:
+            event_keywords = ["flood", "earthquake", "protest", "strike", "blast", "explosion", "accident", "fire", "election", "meeting", "clash", "war"]
+            for kw in event_keywords:
+                if kw in claim_text.lower():
+                    event_type = kw
+                    break
+        
+        if not entities:
+            caps = re.findall(r'\b[A-Z][a-z]+\b', claim_text)
+            if caps:
+                entities = list(set(caps))
+
     try:
-        client = TavilyClient(api_key=settings.tavily_api_key)
+        client = TavilyClient(api_key=tavily_key)
 
         queries = _generate_search_queries(claim_text, location, event_type, entities)
         retrieval_time = datetime.now(timezone.utc).isoformat()

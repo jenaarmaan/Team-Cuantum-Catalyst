@@ -47,7 +47,23 @@ async def extract_claim(claim_text: str) -> ExtractedClaim:
     Extract structured claim data from raw user text.
     Uses Gemini for NLP extraction.
     """
+    import os
+    gemini_key = settings.gemini_api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not gemini_key or gemini_key.strip() == "":
+        print("[NYASA] Claim extraction skipped: Gemini API credentials are not configured.")
+        return ExtractedClaim(
+            original_text=claim_text,
+            normalized_claim=claim_text,
+            entities=[],
+            event_type=None,
+            location=None,
+            time_reference=None,
+            key_assertion=claim_text,
+            atomic_claims=[claim_text],
+        )
+
     try:
+        genai.configure(api_key=gemini_key)
         model = genai.GenerativeModel(settings.gemini_model)
 
         response = model.generate_content(

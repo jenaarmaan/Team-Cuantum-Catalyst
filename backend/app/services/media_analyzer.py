@@ -82,7 +82,28 @@ async def analyze_media(image_bytes: bytes, claim_text: str) -> MediaAnalysisRes
     Analyze an image for media authenticity and context consistency.
     These are SEPARATE dimensions — a key NYASA differentiator.
     """
+    import os
+    gemini_key = settings.gemini_api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not gemini_key or gemini_key.strip() == "":
+        print("[NYASA] Media analysis skipped: Gemini API credentials are not configured.")
+        return MediaAnalysisResult(
+            media_authenticity=MediaAuthenticity(
+                assessment="unable_to_determine",
+                signals=[],
+                description="Gemini API credentials are not configured.",
+            ),
+            context_consistency=ContextConsistency(
+                assessment="unverifiable",
+                signals=[],
+                description="Gemini API credentials are not configured.",
+            ),
+            visual_description="Analysis unavailable",
+            ocr_text=None,
+            media_quality=MediaQuality.MODERATE,
+        )
+
     try:
+        genai.configure(api_key=gemini_key)
         model = genai.GenerativeModel(settings.gemini_model)
 
         # Prepare the image for Gemini
