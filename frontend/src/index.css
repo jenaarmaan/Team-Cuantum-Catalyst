@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+/* ── NYASA Design System ── */
+
+@theme {
+  /* Deep space navy background palette */
+  --color-nyasa-bg: #060a14;
+  --color-nyasa-surface: #0d1321;
+  --color-nyasa-card: #131b2e;
+  --color-nyasa-card-hover: #1a2540;
+  --color-nyasa-border: #1e293b;
+  --color-nyasa-border-light: #2d3a52;
+
+  /* Primary accent — electric blue */
+  --color-nyasa-primary: #3b82f6;
+  --color-nyasa-primary-glow: #2563eb;
+  --color-nyasa-primary-muted: #1d4ed8;
+
+  /* Text */
+  --color-nyasa-text: #e2e8f0;
+  --color-nyasa-text-muted: #94a3b8;
+  --color-nyasa-text-dim: #64748b;
+
+  /* Assessment colors */
+  --color-nyasa-supported: #10b981;
+  --color-nyasa-supported-bg: rgba(16, 185, 129, 0.1);
+  --color-nyasa-misleading: #f59e0b;
+  --color-nyasa-misleading-bg: rgba(245, 158, 11, 0.1);
+  --color-nyasa-contradicted: #ef4444;
+  --color-nyasa-contradicted-bg: rgba(239, 68, 68, 0.1);
+  --color-nyasa-inconclusive: #8b5cf6;
+  --color-nyasa-inconclusive-bg: rgba(139, 92, 246, 0.1);
+  --color-nyasa-manipulation: #ec4899;
+  --color-nyasa-manipulation-bg: rgba(236, 72, 153, 0.1);
+
+  /* Evidence stance */
+  --color-evidence-supports: #10b981;
+  --color-evidence-contradicts: #ef4444;
+  --color-evidence-context: #3b82f6;
+  --color-evidence-unresolved: #6b7280;
+}
+
+/* ── Base styles ── */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--color-nyasa-bg);
+  color: var(--color-nyasa-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Glassmorphism card ── */
+
+.glass-card {
+  background: linear-gradient(
+    135deg,
+    rgba(13, 19, 33, 0.8),
+    rgba(19, 27, 46, 0.6)
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-nyasa-border);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  border-color: var(--color-nyasa-border-light);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Confidence ring animation ── */
+
+@keyframes confidence-fill {
+  from {
+    stroke-dashoffset: 283;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.4);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-nyasa-card) 25%,
+    var(--color-nyasa-card-hover) 50%,
+    var(--color-nyasa-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* ── Scrollbar ── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-nyasa-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-nyasa-border-light);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-nyasa-text-dim);
+}
