@@ -3,41 +3,41 @@
 /* ── NYASA Design System ── */
 
 @theme {
-  /* Deep space navy background palette */
-  --color-nyasa-bg: #060a14;
-  --color-nyasa-surface: #0d1321;
-  --color-nyasa-card: #131b2e;
-  --color-nyasa-card-hover: #1a2540;
-  --color-nyasa-border: #1e293b;
-  --color-nyasa-border-light: #2d3a52;
+  /* Technical light blueprint palette */
+  --color-nyasa-bg: #f8fafc;
+  --color-nyasa-surface: #ffffff;
+  --color-nyasa-card: #ffffff;
+  --color-nyasa-card-hover: #f1f5f9;
+  --color-nyasa-border: #e2e8f0;
+  --color-nyasa-border-light: #cbd5e1;
 
-  /* Primary accent — electric blue */
-  --color-nyasa-primary: #3b82f6;
-  --color-nyasa-primary-glow: #2563eb;
-  --color-nyasa-primary-muted: #1d4ed8;
+  /* Primary accent — blue */
+  --color-nyasa-primary: #0284c7;
+  --color-nyasa-primary-glow: #0369a1;
+  --color-nyasa-primary-muted: #e0f2fe;
 
   /* Text */
-  --color-nyasa-text: #e2e8f0;
-  --color-nyasa-text-muted: #94a3b8;
+  --color-nyasa-text: #0f172a;
+  --color-nyasa-text-muted: #475569;
   --color-nyasa-text-dim: #64748b;
 
   /* Assessment colors */
-  --color-nyasa-supported: #10b981;
-  --color-nyasa-supported-bg: rgba(16, 185, 129, 0.1);
-  --color-nyasa-misleading: #f59e0b;
-  --color-nyasa-misleading-bg: rgba(245, 158, 11, 0.1);
-  --color-nyasa-contradicted: #ef4444;
-  --color-nyasa-contradicted-bg: rgba(239, 68, 68, 0.1);
-  --color-nyasa-inconclusive: #8b5cf6;
-  --color-nyasa-inconclusive-bg: rgba(139, 92, 246, 0.1);
-  --color-nyasa-manipulation: #ec4899;
-  --color-nyasa-manipulation-bg: rgba(236, 72, 153, 0.1);
+  --color-nyasa-supported: #15803d;
+  --color-nyasa-supported-bg: rgba(21, 128, 61, 0.05);
+  --color-nyasa-misleading: #b45309;
+  --color-nyasa-misleading-bg: rgba(180, 83, 9, 0.05);
+  --color-nyasa-contradicted: #b91c1c;
+  --color-nyasa-contradicted-bg: rgba(185, 28, 28, 0.05);
+  --color-nyasa-inconclusive: #6d28d9;
+  --color-nyasa-inconclusive-bg: rgba(109, 40, 217, 0.05);
+  --color-nyasa-manipulation: #be185d;
+  --color-nyasa-manipulation-bg: rgba(190, 24, 93, 0.05);
 
   /* Evidence stance */
-  --color-evidence-supports: #10b981;
-  --color-evidence-contradicts: #ef4444;
-  --color-evidence-context: #3b82f6;
-  --color-evidence-unresolved: #6b7280;
+  --color-evidence-supports: #15803d;
+  --color-evidence-contradicts: #b91c1c;
+  --color-evidence-context: #0284c7;
+  --color-evidence-unresolved: #4b5563;
 }
 
 /* ── Base styles ── */
@@ -64,6 +64,12 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Blueprint Grid background pattern */
+  background-image: 
+    linear-gradient(to right, rgba(2, 132, 199, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(2, 132, 199, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 .mx-auto {
@@ -71,24 +77,24 @@ body {
   margin-right: auto !important;
 }
 
+/* Monospace Technical font class */
+.font-mono-tech {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Consolas, monospace;
+}
+
 /* ── Glassmorphism card ── */
 
 .glass-card {
-  background: linear-gradient(
-    135deg,
-    rgba(13, 19, 33, 0.8),
-    rgba(19, 27, 46, 0.6)
-  );
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--color-nyasa-card);
   border: 1px solid var(--color-nyasa-border);
-  border-radius: 16px;
-  transition: all 0.3s ease;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
 }
 
 .glass-card:hover {
   border-color: var(--color-nyasa-border-light);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
 }
 
 /* ── Confidence ring animation ── */
