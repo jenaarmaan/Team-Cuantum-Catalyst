@@ -94,14 +94,14 @@ export default function SourceContextMap({ claimedLocation, evidenceLocations }:
 
     // Claimed Location Marker
     if (claimedLocation) {
-      const claimIcon = createHtmlIcon('#0284c7', '#ffffff', true);
+      const claimIcon = createHtmlIcon('#005faf', '#ffffff', true);
       L.marker([claimedLocation.lat, claimedLocation.lng], { icon: claimIcon })
         .addTo(map)
         .bindPopup(`
-          <div class="font-sans text-xs p-1">
-            <p class="font-bold text-nyasa-primary">Claimed Location</p>
-            <p class="text-slate-800 font-medium">${claimedLocation.label}</p>
-            <p class="text-slate-500 text-[10px]">Lat: ${claimedLocation.lat}, Lng: ${claimedLocation.lng}</p>
+          <div style="font-family: 'Inter', system-ui, sans-serif; font-size: 12px; padding: 4px; border-radius: 8px;">
+            <p style="font-weight: 700; color: #005faf; margin: 0 0 2px 0;">Claimed Location</p>
+            <p style="color: #0f172a; font-weight: 500; margin: 0 0 2px 0;">${claimedLocation.label}</p>
+            <p style="color: #64748b; font-size: 10px; margin: 0;">Lat: ${claimedLocation.lat}, Lng: ${claimedLocation.lng}</p>
           </div>
         `);
     }
@@ -109,20 +109,20 @@ export default function SourceContextMap({ claimedLocation, evidenceLocations }:
     // Evidence Markers
     for (const loc of evidenceLocations) {
       const isContradiction = loc.relation === 'contradicts';
-      const color = isContradiction ? '#ef4444' : '#10b981';
+      const color = isContradiction ? '#b91c1c' : '#15803d';
       const ringColor = '#ffffff';
       const icon = createHtmlIcon(color, ringColor, false);
 
       L.marker([loc.lat, loc.lng], { icon })
         .addTo(map)
         .bindPopup(`
-          <div class="font-sans text-xs p-1">
-            <p class="font-bold ${isContradiction ? 'text-red-600' : 'text-emerald-600'}">
+          <div style="font-family: 'Inter', system-ui, sans-serif; font-size: 12px; padding: 4px; border-radius: 8px;">
+            <p style="font-weight: 700; color: ${isContradiction ? '#b91c1c' : '#15803d'}; margin: 0 0 2px 0;">
               Evidence (${loc.relation.toUpperCase()})
             </p>
-            <p class="text-slate-800 font-semibold">${loc.label}</p>
-            <p class="text-slate-600 text-[10px] mt-1">Source: <a href="${loc.source}" target="_blank" class="text-nyasa-primary hover:underline">${loc.source.split('/')[2] || 'SourceLink'}</a></p>
-            ${loc.date ? `<p class="text-slate-500 text-[10px]">Date: ${loc.date}</p>` : ''}
+            <p style="color: #0f172a; font-weight: 600; margin: 0 0 4px 0;">${loc.label}</p>
+            <p style="color: #475569; font-size: 10px; margin: 0;">Source: <a href="${loc.source}" target="_blank" style="color: #005faf; text-decoration: none; font-weight: 500;">${loc.source.split('/')[2] || 'SourceLink'}</a></p>
+            ${loc.date ? `<p style="color: #64748b; font-size: 10px; margin: 2px 0 0 0;">Date: ${loc.date}</p>` : ''}
           </div>
         `);
 

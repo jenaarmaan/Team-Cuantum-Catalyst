@@ -11,18 +11,18 @@
   --color-nyasa-border: #e2e8f0;
   --color-nyasa-border-light: #cbd5e1;
 
-  /* Primary accent — blue */
-  --color-nyasa-primary: #0284c7;
-  --color-nyasa-primary-glow: #0369a1;
+  /* Primary accent — Material 3 Blue */
+  --color-nyasa-primary: #005faf;
+  --color-nyasa-primary-glow: #004580;
   --color-nyasa-primary-muted: #e0f2fe;
 
   /* Text */
   --color-nyasa-text: #0f172a;
   --color-nyasa-text-muted: #475569;
   --color-nyasa-text-dim: #64748b;
-  --nyasa-grid: rgba(2, 132, 199, 0.04);
+  --nyasa-grid: rgba(0, 95, 175, 0.04);
 
-  /* Assessment colors */
+  /* Assessment colors - Consolidated semantic steps */
   --color-nyasa-supported: #15803d;
   --color-nyasa-supported-bg: rgba(21, 128, 61, 0.05);
   --color-nyasa-misleading: #b45309;
@@ -37,7 +37,7 @@
   /* Evidence stance */
   --color-evidence-supports: #15803d;
   --color-evidence-contradicts: #b91c1c;
-  --color-evidence-context: #0284c7;
+  --color-evidence-context: #005faf;
   --color-evidence-unresolved: #4b5563;
 }
 
@@ -64,6 +64,76 @@
   --color-nyasa-contradicted-bg: rgba(239, 68, 68, 0.1);
   --color-nyasa-inconclusive-bg: rgba(139, 92, 246, 0.1);
   --color-nyasa-manipulation-bg: rgba(236, 72, 153, 0.1);
+}
+
+/* ── Material 3 Typography Scale ── */
+
+.text-display-large {
+  font-size: 2.25rem; /* 36px */
+  line-height: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+@media (min-width: 768px) {
+  .text-display-large {
+    font-size: 3rem; /* 48px */
+    line-height: 3.5rem;
+  }
+}
+
+.text-headline-medium {
+  font-size: 1.5rem; /* 24px */
+  line-height: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+@media (min-width: 768px) {
+  .text-headline-medium {
+    font-size: 1.875rem; /* 30px */
+    line-height: 2.25rem;
+  }
+}
+
+.text-headline-small {
+  font-size: 1.25rem; /* 20px */
+  line-height: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.text-title-medium {
+  font-size: 1.125rem; /* 18px */
+  line-height: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.text-title-small {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.text-body-medium {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.5rem;
+  font-weight: 400;
+  letter-spacing: 0.015em;
+}
+
+.text-label-large {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.25rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.text-label-small {
+  font-size: 0.75rem; /* 12px */
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
 }
 
 /* ── Base styles ── */
@@ -98,6 +168,17 @@ body {
   background-size: 24px 24px;
 }
 
+/* ── Standard Focus States ── */
+button:focus-visible, 
+a:focus-visible, 
+input:focus-visible, 
+textarea:focus-visible, 
+[role="button"]:focus-visible {
+  outline: none;
+  border-color: var(--color-nyasa-primary) !important;
+  box-shadow: 0 0 0 2px var(--color-nyasa-primary) !important;
+}
+
 .mx-auto {
   margin-left: auto !important;
   margin-right: auto !important;
@@ -108,14 +189,14 @@ body {
   font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Consolas, monospace;
 }
 
-/* ── Glassmorphism card ── */
+/* ── Material 3 Cards ── */
 
 .glass-card {
   background: var(--color-nyasa-card);
   border: 1px solid var(--color-nyasa-border);
-  border-radius: 12px;
+  border-radius: 16px; /* Material 3 standard 16px rounding */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.02);
-  transition: all 0.2s ease;
+  transition: all 200ms cubic-bezier(0.2, 0, 0, 1); /* M3 standard easing curve */
 }
 
 .glass-card:hover {

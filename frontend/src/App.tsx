@@ -17,9 +17,10 @@ import EvidenceCard from './components/EvidenceCard';
 import ProblemScenario from './components/ProblemScenario';
 import ComparisonTable from './components/ComparisonTable';
 import PipelineDiagram from './components/PipelineDiagram';
+import ReportFakePage from './components/ReportFakePage';
 import './index.css';
 
-type AppState = 'input' | 'loading' | 'result' | 'error';
+type AppState = 'input' | 'loading' | 'result' | 'error' | 'report';
 type ThemeMode = 'system' | 'light' | 'dark';
 
 function App() {
@@ -153,13 +154,13 @@ function App() {
                   Multi-Signal Context Engine
                 </div>
                 
-                <h1 className="text-4xl md:text-5xl font-extrabold text-nyasa-text mb-6 tracking-tight leading-tight max-w-3xl mx-auto">
+                <h1 className="text-display-large text-nyasa-text mb-6 max-w-3xl mx-auto">
                   <span className="text-nyasa-primary">NYASA verifies if you can trust the claim.</span>
                 </h1>
                 
-                <p className="text-sm md:text-md text-nyasa-text-muted max-w-xl mx-auto leading-relaxed mb-8">
+                <p className="text-body-medium text-nyasa-text-muted max-w-xl mx-auto leading-relaxed mb-8">
                   Assessing media authenticity is more than watermarking. NYASA fuses file diagnostics, 
-                  EXIF metadata, C2PA cryptographic lineage, visual forensicts, and web evidence to determine if media matches its claim.
+                  EXIF metadata, C2PA cryptographic lineage, visual forensics, and web evidence to determine if media matches its claim.
                 </p>
 
                 <button 
@@ -189,8 +190,8 @@ function App() {
             {/* 5. LIVE ANALYZER SECTION */}
             <section id="analyzer-section" className="border-t border-nyasa-border py-16">
               <div className="text-center max-w-2xl mx-auto mb-10">
-                <h2 className="text-3xl font-bold text-nyasa-text tracking-tight">Interactive Analyzer</h2>
-                <p className="text-sm text-nyasa-text-dim mt-2">
+                <h2 className="text-headline-medium text-nyasa-text">Interactive Analyzer</h2>
+                <p className="text-body-medium text-nyasa-text-dim mt-2">
                   Upload an image, video, or audio file, attach a claim, and NYASA's engine will evaluate its credibility.
                 </p>
               </div>
@@ -276,6 +277,16 @@ function App() {
                       </div>
                     )}
                   </div>
+                )}
+
+                {/* Indian Reporting Portal Trigger */}
+                {result.assessment.label !== 'likely_authentic_and_supported' && result.assessment.label !== 'likely_supported' && (
+                  <button
+                    onClick={() => setState('report')}
+                    className="mt-4 w-full py-2 px-3 text-xs font-semibold rounded-xl bg-nyasa-contradicted/10 text-nyasa-contradicted hover:bg-nyasa-contradicted/20 border border-nyasa-contradicted/20 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    🇮🇳 Report Fake Info
+                  </button>
                 )}
               </div>
 
@@ -429,6 +440,14 @@ function App() {
               </p>
             </div>
           </div>
+        )}
+
+        {/* ── 5. REPORT STATE ── */}
+        {state === 'report' && result && (
+          <ReportFakePage 
+            claimText={result.claim_text} 
+            onBack={() => setState('result')} 
+          />
         )}
       </main>
 

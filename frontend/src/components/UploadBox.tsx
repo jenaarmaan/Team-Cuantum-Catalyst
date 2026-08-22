@@ -82,9 +82,9 @@ export default function UploadBox({ onSubmit, isLoading }: UploadBoxProps) {
         onClick={() => fileInputRef.current?.click()}
         className={`
           relative cursor-pointer rounded-2xl border-2 border-dashed p-8
-          transition-all duration-300 mb-5 text-left
+          transition-all duration-200 mb-5 text-left
           ${isDragging
-            ? 'border-nyasa-primary bg-nyasa-primary/5 scale-[1.02]'
+            ? 'border-nyasa-primary bg-nyasa-primary/5 scale-[1.01]'
             : invalidFile
               ? 'border-nyasa-contradicted bg-nyasa-contradicted/5'
               : preview
@@ -107,7 +107,7 @@ export default function UploadBox({ onSubmit, isLoading }: UploadBoxProps) {
               <img
                 src={preview}
                 alt="Uploaded preview"
-                className="max-h-48 rounded-xl object-contain shadow-lg"
+                className="max-h-48 rounded-2xl object-contain shadow-md"
               />
             )}
             
@@ -115,18 +115,18 @@ export default function UploadBox({ onSubmit, isLoading }: UploadBoxProps) {
               <video
                 src={preview}
                 controls
-                className="max-h-48 w-full max-w-md rounded-xl object-contain shadow-lg bg-black"
+                className="max-h-48 w-full max-w-md rounded-2xl object-contain shadow-md bg-black"
                 onClick={(e) => e.stopPropagation()}
               />
             )}
 
             {mediaType === 'audio' && (
               <div 
-                className="w-full max-w-md p-4 rounded-xl border border-nyasa-border bg-slate-50/50 flex flex-col items-center gap-3"
+                className="w-full max-w-md p-4 rounded-2xl border border-nyasa-border bg-slate-50/50 flex flex-col items-center gap-3"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center gap-3 w-full">
-                  <div className="w-10 h-10 rounded-lg bg-nyasa-primary/10 flex items-center justify-center text-nyasa-primary text-lg">
+                  <div className="w-10 h-10 rounded-xl bg-nyasa-primary/10 flex items-center justify-center text-nyasa-primary text-lg">
                     🎵
                   </div>
                   <div className="flex-1 min-w-0">
@@ -176,9 +176,9 @@ export default function UploadBox({ onSubmit, isLoading }: UploadBoxProps) {
           placeholder='e.g., "This image shows flooding in Mysuru today"'
           rows={3}
           maxLength={10000}
-          className="w-full px-4 py-3 rounded-xl bg-nyasa-surface border border-nyasa-border
+          className="w-full px-4 py-3 rounded-2xl bg-nyasa-surface border border-nyasa-border
                      text-nyasa-text placeholder:text-nyasa-text-dim
-                     focus:outline-none focus:border-nyasa-primary focus:ring-1 focus:ring-nyasa-primary/30
+                     focus:outline-none focus:border-nyasa-primary focus:ring-2 focus:ring-nyasa-primary/20
                      transition-all duration-200 resize-none"
         />
         <p className="text-xs text-nyasa-text-dim mt-1 text-right">

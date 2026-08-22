@@ -8,11 +8,11 @@ interface PillarsPanelProps {
 }
 
 const DIRECTION_STYLES: Record<string, { label: string; text: string; bg: string }> = {
-  SUPPORTS_AUTHENTICITY: { label: 'Supports Authenticity', text: 'text-emerald-600', bg: 'bg-emerald-50' },
-  SUPPORTS_CLAIM: { label: 'Supports Claim', text: 'text-emerald-600', bg: 'bg-emerald-50' },
-  CONTRADICTS_AUTHENTICITY: { label: 'Contradicts Authenticity', text: 'text-rose-600', bg: 'bg-rose-50' },
-  CONTRADICTS_CLAIM: { label: 'Contradicts Claim', text: 'text-rose-600', bg: 'bg-rose-50' },
-  NEUTRAL: { label: 'Neutral', text: 'text-slate-500', bg: 'bg-slate-50' },
+  SUPPORTS_AUTHENTICITY: { label: 'Supports Authenticity', text: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/30' },
+  SUPPORTS_CLAIM: { label: 'Supports Claim', text: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/30' },
+  CONTRADICTS_AUTHENTICITY: { label: 'Contradicts Authenticity', text: 'text-rose-700 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-950/30 border border-rose-200/30' },
+  CONTRADICTS_CLAIM: { label: 'Contradicts Claim', text: 'text-rose-700 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-950/30 border border-rose-200/30' },
+  NEUTRAL: { label: 'Neutral', text: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-50 dark:bg-slate-900/30 border border-slate-200/30' },
 };
 
 export default function PillarsPanel({ pillars, claimText }: PillarsPanelProps) {
@@ -51,11 +51,11 @@ export default function PillarsPanel({ pillars, claimText }: PillarsPanelProps) 
     <div className="glass-card p-6 animate-fade-in-up" style={{ animationDelay: '150ms' }}>
       {/* Title Header */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-9 h-9 rounded-lg bg-nyasa-primary/10 flex items-center justify-center">
+        <div className="w-9 h-9 rounded-xl bg-nyasa-primary/10 flex items-center justify-center">
           <span className="text-lg">🏛️</span>
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-nyasa-text">Verification Pillars</h3>
+          <h3 className="text-title-medium text-nyasa-text">Verification Pillars</h3>
           <p className="text-xs text-nyasa-text-dim">
             Six independent diagnostic dimensions of media and claim authenticity
           </p>
@@ -63,7 +63,7 @@ export default function PillarsPanel({ pillars, claimText }: PillarsPanelProps) 
       </div>
 
       {/* 6 Linear Expandable Rows */}
-      <div className="divide-y divide-nyasa-border border border-nyasa-border rounded-xl overflow-hidden bg-white">
+      <div className="divide-y divide-nyasa-border border border-nyasa-border rounded-2xl overflow-hidden bg-white dark:bg-nyasa-surface">
         {pillars.map((pillar) => {
           const isExpanded = expandedPillar === pillar.pillar_id;
           
@@ -91,10 +91,10 @@ export default function PillarsPanel({ pillars, claimText }: PillarsPanelProps) 
                   <span className={`
                     w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-xs font-bold font-mono-tech
                     ${isNotApplicable 
-                      ? 'bg-slate-100 text-slate-400' 
+                      ? 'bg-slate-100 text-slate-400 dark:bg-slate-800' 
                       : isUnavailable 
-                        ? 'bg-slate-100 text-slate-500 border border-slate-200' 
-                        : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                        ? 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800' 
+                        : 'bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/20'
                     }
                   `}>
                     {isNotApplicable ? '—' : isUnavailable ? '?' : '✓'}
@@ -105,7 +105,7 @@ export default function PillarsPanel({ pillars, claimText }: PillarsPanelProps) 
                       <span className="font-mono-tech font-bold text-xs text-nyasa-text-dim shrink-0">
                         {pillar.pillar_id}
                       </span>
-                      <h4 className="text-sm font-bold text-nyasa-text truncate">
+                      <h4 className="text-title-small text-nyasa-text truncate">
                         {pillar.name}
                       </h4>
                     </div>
