@@ -1,0 +1,9 @@
+- [x] Define Material 3 typography and color tokens in `index.css`
+- [x] Create `ReportFakePage.tsx` component
+- [x] Update `App.tsx` state machine and layout elements
+- [x] Polish `UploadBox.tsx` corners, borders, transitions
+- [x] Polish `PillarsPanel.tsx` expandable row heights and tag colors
+- [x] Polish `SourceContextMap.tsx` leaflet popup colors and style tags
+- [x] Polish presentation views (`ProblemScenario.tsx`, `ComparisonTable.tsx`, `PipelineDiagram.tsx`)
+- [x] Run build verification (`npm run build`)
+- [x] Verify E2E results and update `walkthrough.md`
