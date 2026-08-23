@@ -588,7 +588,8 @@ async def _run_unified_gemini_analysis(
             temperature=0.2,
             max_output_tokens=2048,
             response_mime_type="application/json"
-        )
+        ),
+        request_options={"timeout": 15.0}
     )
     
     response_text = response.text.strip()
@@ -702,6 +703,11 @@ async def run_verification(
     evidence = await retrieve_evidence(
         claim_text=claim_text,
     )
+    if not evidence:
+        print("[NYASA LOG] Tavily Search context: UNAVAILABLE or missing credentials")
+    else:
+        print(f"[NYASA LOG] Tavily Search context: SUCCESS (Harvested {len(evidence)} items)")
+        
     print(f"[NYASA] Harvested {len(evidence)} unique URLs from search queries.")
 
     # Cap to top 3 evidence items to respect Gemini API rate limits (15 RPM)
@@ -712,6 +718,7 @@ async def run_verification(
     print(f"\n[NYASA] == STEP 2/7: UNIFIED GEMINI ANALYSIS (NLP + Vision + Stance + Explanation) ==")
     try:
         analysis_data = await _run_unified_gemini_analysis(claim_text, image_bytes, evidence)
+        print("[NYASA LOG] Gemini Analysis: SUCCESS")
         
         # Ingest claim
         claim_data = analysis_data.get("extracted_claim", {})
@@ -812,7 +819,13 @@ async def run_verification(
         }
         
     except Exception as exc:
-        print(f"[NYASA] Unified Gemini Analysis failed: {exc}")
+        # Sanitize exception message to prevent potential API key leakage in logs
+        import re
+        exc_str = str(exc)
+        exc_str = re.sub(r'AIzaSy[A-Za-z0-9_-]{35}', 'AIzaSy...[MASKED]', exc_str)
+        exc_str = re.sub(r'tvly-[A-Za-z0-9_-]{32}', 'tvly-...[MASKED]', exc_str)
+        print(f"[NYASA LOG] Gemini Analysis: FAILURE — Running local fallback pipeline. Error: {exc_str}")
+        print(f"[NYASA] Unified Gemini Analysis failed: {exc_str}")
         # Build local fallback claim extraction
         extracted_claim = ExtractedClaim(
             original_text=claim_text,

@@ -183,7 +183,7 @@ export default function PillarsPanel({ pillars, claimText }: PillarsPanelProps) 
                   )}
 
                   {/* Geolocation Map for P6 */}
-                  {pillar.pillar_id === 'P6' && (
+                  {pillar.pillar_id === 'P6' && claimedLocation && (
                     <div className="mt-4 pt-2">
                       <p className="text-[10px] font-bold text-nyasa-text-dim uppercase tracking-wider mb-2 font-mono-tech">Geographic Evidence Map</p>
                       <SourceContextMap 

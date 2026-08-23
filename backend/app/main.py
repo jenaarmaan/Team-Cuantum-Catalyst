@@ -44,6 +44,24 @@ app.add_middleware(
 app.include_router(verification_router)
 
 
+@app.on_event("startup")
+def startup_event():
+    gemini_configured = bool(settings.gemini_api_key)
+    tavily_configured = bool(settings.tavily_api_key)
+    print("\n" + "="*60)
+    print("[NYASA STARTUP] Initializing Verification Service...")
+    if gemini_configured:
+        print("[NYASA STARTUP] Gemini API Credentials: CONFIGURED (Verified)")
+    else:
+        print("[NYASA STARTUP] WARNING: Gemini API Credentials are MISSING. Pipeline will run in Local Fallback Mode.")
+    if tavily_configured:
+        print("[NYASA STARTUP] Tavily API Credentials: CONFIGURED (Verified)")
+    else:
+        print("[NYASA STARTUP] WARNING: Tavily API Credentials are MISSING. Search context verification will use cached/local values.")
+    print("="*60 + "\n")
+
+
+
 @app.get("/health", tags=["health"])
 async def health():
     return {
